@@ -15,7 +15,7 @@ const DEFAULTS = {
   },
 };
 
-function mergeConfig(raw = {}) {
+export function mergeConfig(raw = {}) {
   return {
     ...DEFAULTS,
     ...raw,
@@ -23,19 +23,19 @@ function mergeConfig(raw = {}) {
   };
 }
 
-function severityFor(rescheduleCount = 0) {
+export function severityFor(rescheduleCount = 0) {
   if (rescheduleCount >= 4) return 'intervention';
   if (rescheduleCount >= 2) return 'firm';
   return 'gentle';
 }
 
-function overdueBucket(minutes) {
+export function overdueBucket(minutes) {
   if (minutes >= 1440) return 'c';
   if (minutes >= 120) return 'b';
   return 'a';
 }
 
-function buildAlert(tasks, maxItems = 3) {
+export function buildAlert(tasks, maxItems = 3) {
   const top = tasks.slice(0, maxItems);
   const lines = top.map((t) => `• ${t.title} — ${t.minutesOverdue}m overdue (rescheduled ${t.rescheduleCount}x)`);
   return [
@@ -48,7 +48,7 @@ async function ensureDir(filePath) {
   await fs.mkdir(path.dirname(filePath), { recursive: true });
 }
 
-async function loadJson(filePath, fallback) {
+export async function loadJson(filePath, fallback) {
   try {
     const raw = await fs.readFile(filePath, 'utf8');
     return JSON.parse(raw);
@@ -57,12 +57,12 @@ async function loadJson(filePath, fallback) {
   }
 }
 
-async function saveJson(filePath, value) {
+export async function saveJson(filePath, value) {
   await ensureDir(filePath);
   await fs.writeFile(filePath, JSON.stringify(value, null, 2));
 }
 
-function shouldAlertTask(task, prev, nowMs, cooldownMs) {
+export function shouldAlertTask(task, prev, nowMs, cooldownMs) {
   if (!prev) return true;
 
   const elapsed = nowMs - (prev.lastAlertAt || 0);
@@ -75,7 +75,7 @@ function shouldAlertTask(task, prev, nowMs, cooldownMs) {
   return false;
 }
 
-async function fetchOverdue({ mcpUrl, apiKey }) {
+export async function fetchOverdue({ mcpUrl, apiKey }) {
   const body = {
     jsonrpc: '2.0',
     id: 1,
@@ -107,7 +107,7 @@ async function fetchOverdue({ mcpUrl, apiKey }) {
   return Array.isArray(parsed) ? parsed : [];
 }
 
-async function runCheck(api, cfg, stateFile, opts = {}) {
+export async function runCheck(api, cfg, stateFile, opts = {}) {
   const nowMs = Date.now();
   const cooldownMs = cfg.cooldownMinutes * 60 * 1000;
   const state = await loadJson(stateFile, { tasks: {}, lastAlert: null, lastError: null });
