@@ -1,0 +1,22 @@
+{
+  "name": "@openrowlf/openclaw-plugin-boss-pig",
+  "version": "0.1.0",
+  "description": "OpenClaw plugin for Boss Pig overdue checks",
+  "type": "module",
+  "main": "src/index.js",
+  "files": [
+    "src",
+    "openclaw.plugin.json",
+    "README.md"
+  ],
+  "openclaw": {
+    "extensions": [
+      "./src/index.js"
+    ]
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/openrowlf/boss-pig-plugin.git"
+  }
+}

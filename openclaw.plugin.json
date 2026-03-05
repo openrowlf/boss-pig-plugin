@@ -1,0 +1,36 @@
+{
+  "id": "boss-pig-plugin",
+  "name": "Boss Pig Plugin",
+  "version": "0.1.0",
+  "description": "Periodic overdue task checks for Boss Pig MCP with cooldown state.",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "enabled": { "type": "boolean", "default": true },
+      "mcpUrl": { "type": "string", "default": "https://bosspig.moi/mcp" },
+      "apiKey": { "type": "string" },
+      "checkEveryMinutes": { "type": "number", "minimum": 1, "default": 15 },
+      "cooldownMinutes": { "type": "number", "minimum": 1, "default": 720 },
+      "maxItems": { "type": "number", "minimum": 1, "maximum": 20, "default": 3 },
+      "quietHours": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": { "type": "boolean", "default": false },
+          "start": { "type": "string", "default": "23:00" },
+          "end": { "type": "string", "default": "08:00" },
+          "timezone": { "type": "string", "default": "America/Chicago" }
+        }
+      }
+    },
+    "required": ["mcpUrl", "apiKey"]
+  },
+  "uiHints": {
+    "apiKey": { "label": "Boss Pig API Key", "sensitive": true },
+    "mcpUrl": { "label": "Boss Pig MCP URL", "placeholder": "https://bosspig.moi/mcp" },
+    "checkEveryMinutes": { "label": "Check interval (minutes)" },
+    "cooldownMinutes": { "label": "Cooldown (minutes)" },
+    "maxItems": { "label": "Max tasks per alert" }
+  }
+}
