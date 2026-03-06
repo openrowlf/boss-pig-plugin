@@ -2,6 +2,14 @@
 
 Lightweight OpenClaw plugin that periodically checks Boss Pig MCP for overdue tasks and tracks cooldown/escalation state.
 
+## Bundled skill
+
+This plugin repo includes a bundled AgentSkill at:
+
+- `skills/boss-pig/SKILL.md`
+
+After install, keep this skill available in your agent skill discovery paths (or symlink/copy it into your managed skills location if needed).
+
 ## What v0.1 does
 
 - Periodic checks via plugin service (`checkEveryMinutes`)
