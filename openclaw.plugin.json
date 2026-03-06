@@ -8,6 +8,15 @@
     "additionalProperties": false,
     "properties": {
       "enabled": { "type": "boolean", "default": true },
+      "agentId": { "type": "string" },
+      "delivery": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "channel": { "type": "string" },
+          "to": { "type": "string" }
+        }
+      },
       "mcpUrl": { "type": "string", "default": "https://bosspig.moi/mcp" },
       "apiKey": { "type": "string" },
       "checkEveryMinutes": { "type": "number", "minimum": 1, "default": 15 },
@@ -28,6 +37,8 @@
     "required": []
   },
   "uiHints": {
+    "agentId": { "label": "Agent ID to scope checks (e.g. bosspig)" },
+    "delivery": { "label": "Delivery target" },
     "apiKey": { "label": "Boss Pig API Key", "sensitive": true },
     "mcpUrl": { "label": "Boss Pig MCP URL", "placeholder": "https://bosspig.moi/mcp" },
     "checkEveryMinutes": { "label": "Check interval (minutes)" },

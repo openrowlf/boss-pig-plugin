@@ -33,6 +33,11 @@ openclaw plugins install @openrowlf/openclaw-plugin-boss-pig
         "enabled": true,
         "config": {
           "enabled": true,
+          "agentId": "bosspig",
+          "delivery": {
+            "channel": "telegram",
+            "to": "8588367868"
+          },
           "mcpUrl": "https://bosspig.moi/mcp",
           "apiKey": "bp_REPLACE_ME",
           "checkEveryMinutes": 15,

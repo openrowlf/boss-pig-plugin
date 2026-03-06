@@ -3,6 +3,8 @@ import path from 'node:path';
 
 const DEFAULTS = {
   enabled: true,
+  agentId: null,
+  delivery: null,
   mcpUrl: 'https://bosspig.moi/mcp',
   checkEveryMinutes: 15,
   cooldownMinutes: 720,
@@ -20,6 +22,7 @@ export function mergeConfig(raw = {}) {
   return {
     ...DEFAULTS,
     ...raw,
+    delivery: raw.delivery ? { ...raw.delivery } : DEFAULTS.delivery,
     quietHours: { ...DEFAULTS.quietHours, ...(raw.quietHours || {}) },
   };
 }
@@ -174,6 +177,8 @@ export default function register(api) {
       ok: true,
       config: {
         enabled: cfg.enabled,
+        agentId: cfg.agentId,
+        delivery: cfg.delivery,
         mcpUrl: cfg.mcpUrl,
         checkEveryMinutes: cfg.checkEveryMinutes,
         cooldownMinutes: cfg.cooldownMinutes,
@@ -210,6 +215,14 @@ export default function register(api) {
       }
       if (!cfg.apiKey) {
         api.logger.warn('[boss-pig-plugin] missing apiKey; service idle');
+        return;
+      }
+      if (!cfg.agentId) {
+        api.logger.warn('[boss-pig-plugin] missing config.agentId; service idle');
+        return;
+      }
+      if (!cfg.delivery || !cfg.delivery.channel || !cfg.delivery.to) {
+        api.logger.warn('[boss-pig-plugin] missing config.delivery {channel,to}; service idle');
         return;
       }
 
