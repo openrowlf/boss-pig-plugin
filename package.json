@@ -1,5 +1,5 @@
 {
-  "name": "@openrowlf/openclaw-plugin-boss-pig",
+  "name": "@openrowlf/boss-pig",
   "version": "0.1.0",
   "description": "OpenClaw plugin for Boss Pig overdue checks",
   "type": "module",

@@ -1,5 +1,5 @@
 {
-  "id": "boss-pig-plugin",
+  "id": "boss-pig",
   "name": "Boss Pig Plugin",
   "version": "0.1.0",
   "description": "Periodic overdue task checks for Boss Pig MCP with cooldown state.",
@@ -13,6 +13,7 @@
       "checkEveryMinutes": { "type": "number", "minimum": 1, "default": 15 },
       "cooldownMinutes": { "type": "number", "minimum": 1, "default": 720 },
       "maxItems": { "type": "number", "minimum": 1, "maximum": 20, "default": 3 },
+      "manualCommandEnabled": { "type": "boolean", "default": false },
       "quietHours": {
         "type": "object",
         "additionalProperties": false,
@@ -24,7 +25,7 @@
         }
       }
     },
-    "required": ["mcpUrl", "apiKey"]
+    "required": []
   },
   "uiHints": {
     "apiKey": { "label": "Boss Pig API Key", "sensitive": true },

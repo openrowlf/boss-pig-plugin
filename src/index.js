@@ -7,6 +7,7 @@ const DEFAULTS = {
   checkEveryMinutes: 15,
   cooldownMinutes: 720,
   maxItems: 3,
+  manualCommandEnabled: false,
   quietHours: {
     enabled: false,
     start: '23:00',
@@ -181,20 +182,22 @@ export default function register(api) {
     });
   });
 
-  api.registerCommand({
-    name: 'bosspig-check',
-    description: 'Run Boss Pig overdue check now',
-    acceptsArgs: false,
-    requireAuth: true,
-    handler: async () => {
-      try {
-        const result = await runCheck(api, cfg, stateFile, { silent: true });
-        return { text: result.text };
-      } catch (err) {
-        return { text: `Boss Pig check failed: ${err?.message || String(err)}` };
-      }
-    },
-  });
+  if (cfg.manualCommandEnabled) {
+    api.registerCommand({
+      name: 'bosspig-check',
+      description: 'Run Boss Pig overdue check now',
+      acceptsArgs: false,
+      requireAuth: true,
+      handler: async () => {
+        try {
+          const result = await runCheck(api, cfg, stateFile, { silent: true });
+          return { text: result.text };
+        } catch (err) {
+          return { text: `Boss Pig check failed: ${err?.message || String(err)}` };
+        }
+      },
+    });
+  }
 
   let timer = null;
 

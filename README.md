@@ -13,7 +13,7 @@ Lightweight OpenClaw plugin that periodically checks Boss Pig MCP for overdue ta
   - intervention: 4+
 - Registers:
   - Gateway method: `bosspig.status`
-  - Command: `/bosspig-check`
+  - Command: `/bosspig-check` (optional via `manualCommandEnabled: true`)
 
 > Note: v0.1 writes automatic alerts to plugin logs and state. Command `/bosspig-check` returns the current alert text for manual checks.
 
@@ -38,6 +38,7 @@ openclaw plugins install @openrowlf/openclaw-plugin-boss-pig
           "checkEveryMinutes": 15,
           "cooldownMinutes": 720,
           "maxItems": 3,
+          "manualCommandEnabled": false,
           "quietHours": {
             "enabled": false,
             "start": "23:00",
