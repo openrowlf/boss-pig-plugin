@@ -66,8 +66,9 @@ On startup or first use:
 - `list_scheduled_todos`
 - `list_overdue_todos`
 - `add_todo`
-- `update_todo`
-- `schedule_todo`
+- `update_todo` (non-time fields)
+- `schedule_todo` (time changes)
+- `reschedule_todo` (alias for explicit reschedules)
 - `find_open_slots`
 - `list_selected_calendars`
 - `get_upcoming_events`
@@ -79,8 +80,9 @@ On startup or first use:
 - “show scheduled tasks” → `list_scheduled_todos`
 - “show overdue tasks” → `list_overdue_todos`
 - “find free time” → `find_open_slots`
-- “edit task” → `update_todo`
+- “edit task” → `update_todo` (title/notes/priority/status/category only)
 - “schedule this task” → `schedule_todo`
+- “reschedule this task” → `reschedule_todo`
 - “what calendars are selected” → `list_selected_calendars`
 - “what’s coming up” → `get_upcoming_events`
 - “summary of schedule” → `get_schedule_summary`
@@ -90,10 +92,14 @@ On startup or first use:
    - list first, then update/schedule
 2. Confirm ambiguous changes:
    - if multiple matching todos, ask which one
-3. For schedule actions, require explicit time window:
+3. `update_todo` must not be used for time changes.
+4. For schedule actions, require explicit time window:
    - `startIso` and `endIso` must be valid ISO timestamps
-4. After any mutation, summarize what changed.
-5. If auth fails:
+5. Reschedule counting policy:
+   - `schedule_todo`/`reschedule_todo` defaults `countAsReschedule=true`
+   - Use `countAsReschedule=false` only for immediate correction/misinterpretation fixes
+6. After any mutation, summarize what changed.
+7. If auth fails:
    - tell user to regenerate API key or reconnect login in dashboard.
 
 ## Response style
