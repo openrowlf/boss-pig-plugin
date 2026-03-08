@@ -157,11 +157,14 @@ export function shouldAlertTask(task, prev, nowMs, cooldownMs) {
   // First overdue alert after a new reschedule should always fire.
   if ((task.rescheduleCount || 0) > (prev.lastRescheduleCount || 0)) return true;
 
+  // Bucket change also triggers, but only once per bucket (state tracks lastBucket).
+  // Once triggered for a bucket, wait for cooldown or next reschedule.
+  if (overdueBucket(task.minutesOverdue) !== prev.lastBucket) return true;
+
   const elapsed = nowMs - (prev.lastAlertAt || 0);
   if (elapsed >= cooldownMs) return true;
 
   if (severityFor(task.rescheduleCount) !== prev.lastSeverity) return true;
-  if (overdueBucket(task.minutesOverdue) !== prev.lastBucket) return true;
 
   return false;
 }
