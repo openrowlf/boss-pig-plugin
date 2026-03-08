@@ -222,8 +222,9 @@ export async function runCheck(api, cfg, stateFile, opts = {}) {
     };
   }
 
-  const alertText = buildAlert(overdue, cfg.maxItems);
-  const payload = buildHybridPayload(overdue, cfg);
+  // Only include tasks that triggered the alert (toAlert), not all overdue tasks.
+  const alertText = buildAlert(toAlert, cfg.maxItems);
+  const payload = buildHybridPayload(toAlert, cfg);
 
   // Best-effort publish through runtime logger only (portable + safe).
   // Integrators can bridge this via Gateway methods/commands today.
