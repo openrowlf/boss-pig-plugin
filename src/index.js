@@ -318,6 +318,8 @@ export default function register(api) {
     start: () => {
       const cfg = getCfg();
 
+      api.logger.info(`[boss-pig-plugin] startup cfg: enabled=${!!cfg.enabled} hasApiKey=${!!cfg.apiKey} hasAgentId=${!!cfg.agentId} hasDelivery=${!!(cfg.delivery && cfg.delivery.channel && cfg.delivery.to)} apiKeySource=${cfg.__apiKeySource || 'none'}`);
+
       if (!cfg.enabled) {
         api.logger.info('[boss-pig-plugin] disabled');
         return;
