@@ -27,6 +27,35 @@ export function mergeConfig(raw = {}) {
   };
 }
 
+export function resolveEffectiveConfig(baseCfg, globalCfg = null) {
+  const cfg = mergeConfig(baseCfg || {});
+  const skill = globalCfg?.skills?.entries?.['boss-pig'] || null;
+
+  if (!cfg.apiKey && skill?.apiKey) {
+    cfg.apiKey = skill.apiKey;
+    cfg.__apiKeySource = 'skills.entries.boss-pig.apiKey';
+  } else if (cfg.apiKey) {
+    cfg.__apiKeySource = 'plugins.entries.boss-pig.config.apiKey';
+  }
+
+  if (!cfg.mcpUrl && skill?.env?.BOSS_PIG_MCP_URL) {
+    cfg.mcpUrl = skill.env.BOSS_PIG_MCP_URL;
+    cfg.__mcpUrlSource = 'skills.entries.boss-pig.env.BOSS_PIG_MCP_URL';
+  } else {
+    cfg.__mcpUrlSource = 'plugins.entries.boss-pig.config.mcpUrl';
+  }
+
+  const pluginKey = String(baseCfg?.apiKey || '').trim();
+  const skillKey = String(skill?.apiKey || '').trim();
+  cfg.__keyDrift = {
+    pluginPresent: !!pluginKey,
+    skillPresent: !!skillKey,
+    mismatch: !!pluginKey && !!skillKey && pluginKey !== skillKey,
+  };
+
+  return cfg;
+}
+
 export function severityFor(rescheduleCount = 0) {
   if (rescheduleCount >= 4) return 'intervention';
   if (rescheduleCount >= 2) return 'firm';
@@ -219,13 +248,23 @@ export async function runCheck(api, cfg, stateFile, opts = {}) {
 }
 
 export default function register(api) {
-  const cfg = mergeConfig(api?.entry?.config || {});
+  const baseCfg = mergeConfig(api?.entry?.config || {});
+  const loadGlobalConfig = () => {
+    try {
+      return api?.runtime?.core?.config?.loadConfig ? api.runtime.core.config.loadConfig() : null;
+    } catch {
+      return null;
+    }
+  };
+  const getCfg = () => resolveEffectiveConfig(baseCfg, loadGlobalConfig());
+
   const stateDir = api?.runtime?.state?.resolveStateDir
     ? api.runtime.state.resolveStateDir(api.config)
     : process.cwd();
   const stateFile = path.join(stateDir, 'boss-pig-plugin', 'overdue-alert-state.json');
 
   api.registerGatewayMethod('bosspig.status', async ({ respond }) => {
+    const cfg = getCfg();
     const state = await loadJson(stateFile, { tasks: {}, lastAlert: null, lastError: null });
     respond(true, {
       ok: true,
@@ -236,12 +275,14 @@ export default function register(api) {
         mcpUrl: cfg.mcpUrl,
         checkEveryMinutes: cfg.checkEveryMinutes,
         cooldownMinutes: cfg.cooldownMinutes,
+        apiKeySource: cfg.__apiKeySource || null,
+        keyDrift: cfg.__keyDrift,
       },
       state,
     });
   });
 
-  if (cfg.manualCommandEnabled) {
+  if (baseCfg.manualCommandEnabled) {
     api.registerCommand({
       name: 'bosspig-check',
       description: 'Run Boss Pig overdue check now',
@@ -249,6 +290,7 @@ export default function register(api) {
       requireAuth: true,
       handler: async () => {
         try {
+          const cfg = getCfg();
           const result = await runCheck(api, cfg, stateFile, { silent: true });
           return { text: result.text };
         } catch (err) {
@@ -263,12 +305,19 @@ export default function register(api) {
   api.registerService({
     id: 'boss-pig-plugin.service',
     start: () => {
+      const cfg = getCfg();
+
       if (!cfg.enabled) {
         api.logger.info('[boss-pig-plugin] disabled');
         return;
       }
+      if (cfg.__keyDrift?.mismatch) {
+        api.logger.warn('[boss-pig-plugin] apiKey mismatch between plugin config and skills.entries.boss-pig.apiKey');
+      } else if (cfg.__keyDrift?.pluginPresent && !cfg.__keyDrift?.skillPresent) {
+        api.logger.warn('[boss-pig-plugin] plugin apiKey is set but skills.entries.boss-pig.apiKey is empty (subagent skill calls may fail)');
+      }
       if (!cfg.apiKey) {
-        api.logger.warn('[boss-pig-plugin] missing apiKey; service idle');
+        api.logger.warn('[boss-pig-plugin] missing apiKey (plugin config or skills fallback); service idle');
         return;
       }
       if (!cfg.agentId) {
@@ -284,7 +333,8 @@ export default function register(api) {
 
       const tick = async () => {
         try {
-          const result = await runCheck(api, cfg, stateFile);
+          const latestCfg = getCfg();
+          const result = await runCheck(api, latestCfg, stateFile);
           if (!result?.alerted) return;
 
           // Hybrid delivery: enqueue system event to trigger Piggy, fallback to direct message if that fails.
@@ -292,10 +342,10 @@ export default function register(api) {
           let delivered = false;
 
           // Try to enqueue system event for Piggy to pick up via heartbeat
-          if (cfg.agentId) {
+          if (latestCfg.agentId) {
             try {
               // Enqueue to main session - heartbeat will wake Piggy with this context
-              const mainKey = `agent:${cfg.agentId}:main`;
+              const mainKey = `agent:${latestCfg.agentId}:main`;
               api.runtime.system.enqueueSystemEvent(eventText, {
                 sessionKey: mainKey,
                 contextKey: 'boss-pig-plugin',
@@ -303,11 +353,11 @@ export default function register(api) {
               // Request immediate heartbeat to process the event
               api.runtime.system.requestHeartbeatNow({
                 reason: 'boss-pig-plugin-alert',
-                agentId: cfg.agentId,
+                agentId: latestCfg.agentId,
                 sessionKey: mainKey,
               });
               delivered = true;
-              api.logger.info(`[boss-pig-plugin] system event enqueued for agent ${cfg.agentId}`);
+              api.logger.info(`[boss-pig-plugin] system event enqueued for agent ${latestCfg.agentId}`);
             } catch (err) {
               api.logger.warn(`[boss-pig-plugin] system-event bridge failed: ${err?.message || String(err)}`);
             }
@@ -315,9 +365,9 @@ export default function register(api) {
 
           // Fallback: direct channel message if system event didn't work
           if (!delivered) {
-            const sent = await sendFallbackMessage(api, cfg, result.text);
+            const sent = await sendFallbackMessage(api, latestCfg, result.text);
             if (sent) {
-              api.logger.info(`[boss-pig-plugin] fallback message sent to ${cfg.delivery.channel}:${cfg.delivery.to}`);
+              api.logger.info(`[boss-pig-plugin] fallback message sent to ${latestCfg.delivery.channel}:${latestCfg.delivery.to}`);
             }
           }
         } catch (err) {

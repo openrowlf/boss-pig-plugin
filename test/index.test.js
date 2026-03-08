@@ -4,6 +4,7 @@ import path from 'node:path';
 import fs from 'node:fs/promises';
 import {
   mergeConfig,
+  resolveEffectiveConfig,
   severityFor,
   overdueBucket,
   buildAlert,
@@ -20,6 +21,28 @@ describe('boss-pig-plugin helpers', () => {
     expect(cfg.cooldownMinutes).toBe(720);
     expect(cfg.quietHours.enabled).toBe(true);
     expect(cfg.quietHours.start).toBe('23:00');
+  });
+
+  it('resolveEffectiveConfig falls back to skill apiKey when plugin key missing', () => {
+    const cfg = resolveEffectiveConfig(
+      { mcpUrl: 'https://bosspig.moi/mcp' },
+      { skills: { entries: { 'boss-pig': { apiKey: 'bp_skill' } } } },
+    );
+
+    expect(cfg.apiKey).toBe('bp_skill');
+    expect(cfg.__apiKeySource).toBe('skills.entries.boss-pig.apiKey');
+    expect(cfg.__keyDrift.pluginPresent).toBe(false);
+    expect(cfg.__keyDrift.skillPresent).toBe(true);
+  });
+
+  it('resolveEffectiveConfig marks drift when plugin and skill keys differ', () => {
+    const cfg = resolveEffectiveConfig(
+      { apiKey: 'bp_plugin' },
+      { skills: { entries: { 'boss-pig': { apiKey: 'bp_skill' } } } },
+    );
+
+    expect(cfg.__apiKeySource).toBe('plugins.entries.boss-pig.config.apiKey');
+    expect(cfg.__keyDrift.mismatch).toBe(true);
   });
 
   it('severityFor maps counts correctly', () => {
