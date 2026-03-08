@@ -28,7 +28,8 @@ export function mergeConfig(raw = {}) {
 }
 
 export function resolveEffectiveConfig(baseCfg, globalCfg = null) {
-  const cfg = mergeConfig(baseCfg || {});
+  const globalPluginCfg = globalCfg?.plugins?.entries?.['boss-pig']?.config || {};
+  const cfg = mergeConfig({ ...(globalPluginCfg || {}), ...(baseCfg || {}) });
   const skill = globalCfg?.skills?.entries?.['boss-pig'] || null;
 
   if (!cfg.apiKey && skill?.apiKey) {
