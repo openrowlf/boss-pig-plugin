@@ -48,6 +48,59 @@ export function buildAlert(tasks, maxItems = 3) {
   ].join('\n');
 }
 
+function buildHybridPayload(overdue, cfg) {
+  return {
+    type: 'boss_pig.overdue_alert',
+    version: 1,
+    generatedAt: new Date().toISOString(),
+    summary: {
+      totalOverdue: overdue.length,
+      topCount: Math.min(cfg.maxItems, overdue.length),
+    },
+    tasks: overdue.slice(0, cfg.maxItems).map((t) => ({
+      id: t.id,
+      title: t.title,
+      minutesOverdue: t.minutesOverdue || 0,
+      rescheduleCount: t.rescheduleCount || 0,
+      severity: severityFor(t.rescheduleCount || 0),
+    })),
+    policy: {
+      cooldownMinutes: cfg.cooldownMinutes,
+      checkEveryMinutes: cfg.checkEveryMinutes,
+    },
+  };
+}
+
+function buildSystemEventText(payload) {
+  return [
+    'BOSS_PIG_PLUGIN_ALERT',
+    JSON.stringify(payload),
+    'Compose a concise, persona-aligned user message from this payload and send it to the configured chat target.',
+  ].join('\n\n');
+}
+
+async function sendFallbackMessage(api, cfg, text) {
+  const ch = String(cfg?.delivery?.channel || '').toLowerCase();
+  const to = String(cfg?.delivery?.to || '').trim();
+  if (!ch || !to) return false;
+
+  try {
+    if (ch === 'telegram') {
+      await api.runtime.channel.telegram.sendMessageTelegram(to, text, cfg.delivery.accountId ? { accountId: cfg.delivery.accountId } : {});
+      return true;
+    }
+    if (ch === 'discord') {
+      const target = to.startsWith('channel:') || to.startsWith('user:') ? to : `channel:${to}`;
+      await api.runtime.channel.discord.sendMessageDiscord(target, text, cfg.delivery.accountId ? { accountId: cfg.delivery.accountId } : {});
+      return true;
+    }
+  } catch (err) {
+    api.logger.warn(`[boss-pig-plugin] fallback send failed: ${err?.message || String(err)}`);
+  }
+
+  return false;
+}
+
 async function ensureDir(filePath) {
   await fs.mkdir(path.dirname(filePath), { recursive: true });
 }
@@ -136,6 +189,7 @@ export async function runCheck(api, cfg, stateFile, opts = {}) {
   }
 
   const alertText = buildAlert(overdue, cfg.maxItems);
+  const payload = buildHybridPayload(overdue, cfg);
 
   // Best-effort publish through runtime logger only (portable + safe).
   // Integrators can bridge this via Gateway methods/commands today.
@@ -161,7 +215,7 @@ export async function runCheck(api, cfg, stateFile, opts = {}) {
     api.logger.info(`[boss-pig-plugin] ${alertText.replace(/\n/g, ' | ')}`);
   }
 
-  return { overdueCount: overdue.length, alerted: true, text: alertText, toAlertCount: toAlert.length };
+  return { overdueCount: overdue.length, alerted: true, text: alertText, toAlertCount: toAlert.length, payload };
 }
 
 export default function register(api) {
@@ -230,7 +284,42 @@ export default function register(api) {
 
       const tick = async () => {
         try {
-          await runCheck(api, cfg, stateFile);
+          const result = await runCheck(api, cfg, stateFile);
+          if (!result?.alerted) return;
+
+          // Hybrid delivery: enqueue system event to trigger Piggy, fallback to direct message if that fails.
+          const eventText = buildSystemEventText(result.payload);
+          let delivered = false;
+
+          // Try to enqueue system event for Piggy to pick up via heartbeat
+          if (cfg.agentId) {
+            try {
+              // Enqueue to main session - heartbeat will wake Piggy with this context
+              const mainKey = `agent:${cfg.agentId}:main`;
+              api.runtime.system.enqueueSystemEvent(eventText, {
+                sessionKey: mainKey,
+                contextKey: 'boss-pig-plugin',
+              });
+              // Request immediate heartbeat to process the event
+              api.runtime.system.requestHeartbeatNow({
+                reason: 'boss-pig-plugin-alert',
+                agentId: cfg.agentId,
+                sessionKey: mainKey,
+              });
+              delivered = true;
+              api.logger.info(`[boss-pig-plugin] system event enqueued for agent ${cfg.agentId}`);
+            } catch (err) {
+              api.logger.warn(`[boss-pig-plugin] system-event bridge failed: ${err?.message || String(err)}`);
+            }
+          }
+
+          // Fallback: direct channel message if system event didn't work
+          if (!delivered) {
+            const sent = await sendFallbackMessage(api, cfg, result.text);
+            if (sent) {
+              api.logger.info(`[boss-pig-plugin] fallback message sent to ${cfg.delivery.channel}:${cfg.delivery.to}`);
+            }
+          }
         } catch (err) {
           api.logger.warn(`[boss-pig-plugin] check failed: ${err?.message || String(err)}`);
         }
