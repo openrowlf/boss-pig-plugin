@@ -67,7 +67,7 @@ describe('boss-pig-plugin helpers', () => {
     expect(text).toContain('B');
   });
 
-  it('shouldAlertTask respects cooldown and escalation', () => {
+  it('shouldAlertTask triggers on reschedule and bucket change', () => {
     const now = Date.now();
     const prev = {
       lastAlertAt: now - 5 * 60 * 1000,
@@ -76,13 +76,12 @@ describe('boss-pig-plugin helpers', () => {
       lastBucket: 'a',
     };
 
-    // No bucket trigger - only reschedule changes and cooldown
-    expect(shouldAlertTask({ minutesOverdue: 30, rescheduleCount: 1 }, prev, now, 10 * 60 * 1000)).toBe(false); // within cooldown
-    expect(shouldAlertTask({ minutesOverdue: 130, rescheduleCount: 1 }, prev, now, 10 * 60 * 1000)).toBe(false); // bucket change no longer triggers
-    expect(shouldAlertTask({ minutesOverdue: 30, rescheduleCount: 2 }, prev, now, 10 * 60 * 1000)).toBe(true); // reschedule change triggers
-    // Cooldown test: set lastAlertAt to 15 min ago with 10 min cooldown
-    const prevCooldown = { lastAlertAt: now - 15 * 60 * 1000, lastRescheduleCount: 1, lastSeverity: 'gentle', lastBucket: 'a' };
-    expect(shouldAlertTask({ minutesOverdue: 30, rescheduleCount: 1 }, prevCooldown, now, 10 * 60 * 1000)).toBe(true); // cooldown expired
+    // Reschedule change triggers
+    expect(shouldAlertTask({ minutesOverdue: 30, rescheduleCount: 2 }, prev, now, 0)).toBe(true);
+    // Bucket change triggers (30min → 130min crosses A→B)
+    expect(shouldAlertTask({ minutesOverdue: 130, rescheduleCount: 1 }, prev, now, 0)).toBe(true);
+    // Same bucket, no reschedule change - no trigger
+    expect(shouldAlertTask({ minutesOverdue: 60, rescheduleCount: 1 }, prev, now, 0)).toBe(false);
   });
 });
 

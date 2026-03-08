@@ -153,17 +153,12 @@ export async function saveJson(filePath, value) {
 export function shouldAlertTask(task, prev, nowMs, cooldownMs) {
   if (!prev) return true;
 
-  // Simple rule: reschedule resets the cooldown clock.
-  // First overdue alert after a new reschedule should always fire.
+  // Alert triggers: reschedule change OR bucket crossing (once per bucket).
+  // No cooldown needed - buckets provide natural escalation timing.
   if ((task.rescheduleCount || 0) > (prev.lastRescheduleCount || 0)) return true;
 
-  // Bucket change no longer triggers alerts - only reschedule changes and cooldown expiry.
-  // if (overdueBucket(task.minutesOverdue) !== prev.lastBucket) return true;
-
-  const elapsed = nowMs - (prev.lastAlertAt || 0);
-  if (elapsed >= cooldownMs) return true;
-
-  // Severity change is informational only, not a trigger.
+  // Bucket change triggers once when crossing into a new bucket.
+  if (overdueBucket(task.minutesOverdue) !== prev.lastBucket) return true;
 
   return false;
 }
