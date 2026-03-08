@@ -74,11 +74,13 @@ describe('boss-pig-plugin helpers', () => {
       lastRescheduleCount: 1,
       lastSeverity: 'gentle',
       lastBucket: 'a',
+      lastScheduledStart: '2026-03-08T15:30:00.000Z',
     };
 
-    expect(shouldAlertTask({ minutesOverdue: 30, rescheduleCount: 1 }, prev, now, 10 * 60 * 1000)).toBe(false);
-    expect(shouldAlertTask({ minutesOverdue: 130, rescheduleCount: 1 }, prev, now, 10 * 60 * 1000)).toBe(true); // bucket jump
-    expect(shouldAlertTask({ minutesOverdue: 30, rescheduleCount: 2 }, prev, now, 10 * 60 * 1000)).toBe(true); // severity/reschedule change
+    expect(shouldAlertTask({ minutesOverdue: 30, rescheduleCount: 1, scheduledStart: '2026-03-08T15:30:00.000Z' }, prev, now, 10 * 60 * 1000)).toBe(false);
+    expect(shouldAlertTask({ minutesOverdue: 130, rescheduleCount: 1, scheduledStart: '2026-03-08T15:30:00.000Z' }, prev, now, 10 * 60 * 1000)).toBe(true); // bucket jump
+    expect(shouldAlertTask({ minutesOverdue: 30, rescheduleCount: 2, scheduledStart: '2026-03-08T16:00:00.000Z' }, prev, now, 10 * 60 * 1000)).toBe(true); // severity/reschedule change
+    expect(shouldAlertTask({ minutesOverdue: 20, rescheduleCount: 1, scheduledStart: '2026-03-08T16:00:00.000Z' }, prev, now, 10 * 60 * 1000)).toBe(true); // new overdue slot after reschedule bypasses cooldown
   });
 });
 
