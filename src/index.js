@@ -251,7 +251,7 @@ export default function register(api) {
   const baseCfg = mergeConfig(api?.entry?.config || {});
   const loadGlobalConfig = () => {
     try {
-      return api?.runtime?.core?.config?.loadConfig ? api.runtime.core.config.loadConfig() : null;
+      return api?.runtime?.config?.loadConfig ? api.runtime.config.loadConfig() : null;
     } catch {
       return null;
     }
