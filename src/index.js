@@ -1,4 +1,5 @@
 import fs from 'node:fs/promises';
+import fsSync from 'node:fs';
 import path from 'node:path';
 
 const DEFAULTS = {
@@ -252,7 +253,16 @@ export default function register(api) {
   const baseCfg = mergeConfig(api?.entry?.config || {});
   const loadGlobalConfig = () => {
     try {
-      return api?.runtime?.config?.loadConfig ? api.runtime.config.loadConfig() : null;
+      if (api?.runtime?.config?.loadConfig) return api.runtime.config.loadConfig();
+    } catch {
+      // fall through
+    }
+
+    try {
+      const home = process.env.HOME || process.env.USERPROFILE;
+      if (!home) return null;
+      const raw = fsSync.readFileSync(path.join(home, '.openclaw', 'openclaw.json'), 'utf8');
+      return JSON.parse(raw);
     } catch {
       return null;
     }
