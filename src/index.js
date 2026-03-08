@@ -257,7 +257,7 @@ export default function register(api) {
       return null;
     }
   };
-  const getCfg = () => resolveEffectiveConfig(baseCfg, loadGlobalConfig());
+  const getCfg = () => resolveEffectiveConfig(baseCfg, loadGlobalConfig() || api?.config || null);
 
   const stateDir = api?.runtime?.state?.resolveStateDir
     ? api.runtime.state.resolveStateDir(api.config)
