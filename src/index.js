@@ -153,19 +153,13 @@ export async function saveJson(filePath, value) {
 export function shouldAlertTask(task, prev, nowMs, cooldownMs) {
   if (!prev) return true;
 
-  const scheduledStart = String(task?.scheduledStart || '');
-  const prevScheduledStart = String(prev?.lastScheduledStart || '');
-
-  // If this task was rescheduled to a new slot and is now overdue again,
-  // alert immediately regardless of cooldown (once per slot).
-  if ((task.rescheduleCount || 0) > 0 && scheduledStart && prevScheduledStart && scheduledStart !== prevScheduledStart) {
-    return true;
-  }
+  // Simple rule: reschedule resets the cooldown clock.
+  // First overdue alert after a new reschedule should always fire.
+  if ((task.rescheduleCount || 0) > (prev.lastRescheduleCount || 0)) return true;
 
   const elapsed = nowMs - (prev.lastAlertAt || 0);
   if (elapsed >= cooldownMs) return true;
 
-  if ((task.rescheduleCount || 0) > (prev.lastRescheduleCount || 0)) return true;
   if (severityFor(task.rescheduleCount) !== prev.lastSeverity) return true;
   if (overdueBucket(task.minutesOverdue) !== prev.lastBucket) return true;
 
@@ -246,7 +240,6 @@ export async function runCheck(api, cfg, stateFile, opts = {}) {
       lastRescheduleCount: t.rescheduleCount || 0,
       lastSeverity: severityFor(t.rescheduleCount || 0),
       lastBucket: overdueBucket(t.minutesOverdue || 0),
-      lastScheduledStart: t.scheduledStart || null,
     };
   }
 
