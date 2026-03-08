@@ -4,7 +4,7 @@ import path from 'node:path';
 
 const DEFAULTS = {
   enabled: true,
-  agentId: null,
+  agentId: 'bosspig',
   delivery: null,
   mcpUrl: 'https://bosspig.moi/mcp',
   checkEveryMinutes: 15,
@@ -337,11 +337,6 @@ export default function register(api) {
         api.logger.warn('[boss-pig-plugin] missing config.agentId; service idle');
         return;
       }
-      if (!cfg.delivery || !cfg.delivery.channel || !cfg.delivery.to) {
-        api.logger.warn('[boss-pig-plugin] missing config.delivery {channel,to}; service idle');
-        return;
-      }
-
       const tickMs = Math.max(60_000, Math.floor(cfg.checkEveryMinutes * 60_000));
 
       const tick = async () => {
