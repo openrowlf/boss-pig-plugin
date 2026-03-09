@@ -368,7 +368,10 @@ export default function register(api) {
 
           // Try to enqueue system event for Piggy to pick up via heartbeat
           // Skip enqueueing if outside active hours - let next active-hour tick generate fresh data
-          const withinActive = isWithinActiveHours(loadGlobalConfig());
+          const globalCfg = loadGlobalConfig();
+          const agent = (globalCfg?.agents?.list || []).find(a => a.id === 'bosspig');
+          api.logger.info(`[boss-pig-plugin] activeHours config: ${JSON.stringify(agent?.heartbeat?.activeHours)}`);
+          const withinActive = isWithinActiveHours(globalCfg);
           api.logger.info(`[boss-pig-plugin] isWithinActiveHours: ${withinActive}`);
           if (!withinActive) {
             api.logger.info('[boss-pig-plugin] skipped enqueueing outside active hours');
