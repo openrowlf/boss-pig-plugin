@@ -65,7 +65,7 @@ describe('boss-pig-plugin helpers', () => {
     expect(text).toContain('B');
   });
 
-  it('shouldAlertTask triggers on reschedule and bucket change', () => {
+  it('shouldAlertTask triggers on reschedule only', () => {
     const now = Date.now();
     const prev = {
       lastAlertAt: now - 5 * 60 * 1000,
@@ -76,8 +76,8 @@ describe('boss-pig-plugin helpers', () => {
 
     // Reschedule change triggers
     expect(shouldAlertTask({ minutesOverdue: 30, rescheduleCount: 2 }, prev, now, 0)).toBe(true);
-    // Bucket change triggers (30min → 130min crosses A→B)
-    expect(shouldAlertTask({ minutesOverdue: 130, rescheduleCount: 1 }, prev, now, 0)).toBe(true);
+    // Same reschedule count - no trigger (no bucket trigger)
+    expect(shouldAlertTask({ minutesOverdue: 130, rescheduleCount: 1 }, prev, now, 0)).toBe(false);
     // Same bucket, no reschedule change - no trigger
     expect(shouldAlertTask({ minutesOverdue: 60, rescheduleCount: 1 }, prev, now, 0)).toBe(false);
   });

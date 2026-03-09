@@ -52,6 +52,31 @@ export function resolveEffectiveConfig(baseCfg, globalCfg = null) {
   return cfg;
 }
 
+function isWithinActiveHours(globalCfg) {
+  const agent = (globalCfg?.agents?.list || []).find(a => a.id === 'bosspig');
+  const activeHours = agent?.heartbeat?.activeHours;
+  if (!activeHours) return true; // no restriction
+
+  const tz = activeHours.timezone || 'UTC';
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+  const [hh, mm] = formatter.format(new Date()).split(':').map(Number);
+  const currentMinutes = hh * 60 + mm;
+  const [startH, startM] = (activeHours.start || '00:00').split(':').map(Number);
+  const [endH, endM] = (activeHours.end || '23:59').split(':').map(Number);
+  const startMinutes = startH * 60 + startM;
+  const endMinutes = endH * 60 + endM;
+
+  if (startMinutes <= endMinutes) {
+    return currentMinutes >= startMinutes && currentMinutes < endMinutes;
+  }
+  return currentMinutes >= startMinutes || currentMinutes < endMinutes;
+}
+
 export function severityFor(rescheduleCount = 0) {
   if (rescheduleCount >= 4) return 'intervention';
   if (rescheduleCount >= 2) return 'firm';
@@ -342,6 +367,12 @@ export default function register(api) {
           let delivered = false;
 
           // Try to enqueue system event for Piggy to pick up via heartbeat
+          // Skip enqueueing if outside active hours - let next active-hour tick generate fresh data
+          if (!isWithinActiveHours(loadGlobalConfig())) {
+            api.logger.info('[boss-pig-plugin] skipped enqueueing outside active hours');
+            return;
+          }
+
           if (latestCfg.agentId) {
             try {
               // Enqueue to main session - heartbeat will wake Piggy with this context
