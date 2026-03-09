@@ -19,6 +19,28 @@ const DEFAULTS = {
   },
 };
 
+function isWithinQuietHours(cfg) {
+  if (!cfg.quietHours?.enabled) return false;
+  const now = new Date();
+  const tz = cfg.quietHours.timezone || 'UTC';
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+  const [hh, mm] = formatter.format(now).split(':').map(Number);
+  const currentMinutes = hh * 60 + mm;
+  const [startH, startM] = (cfg.quietHours.start || '23:00').split(':').map(Number);
+  const [endH, endM] = (cfg.quietHours.end || '08:00').split(':').map(Number);
+  const startMinutes = startH * 60 + startM;
+  const endMinutes = endH * 60 + endM;
+  if (startMinutes <= endMinutes) {
+    return currentMinutes >= startMinutes && currentMinutes < endMinutes;
+  }
+  return currentMinutes >= startMinutes || currentMinutes < endMinutes;
+}
+
 export function mergeConfig(raw = {}) {
   return {
     ...DEFAULTS,
@@ -343,6 +365,13 @@ export default function register(api) {
       const tick = async () => {
         try {
           const latestCfg = getCfg();
+
+          // Skip alert delivery during quiet hours - let next natural heartbeat pick it up
+          if (isWithinQuietHours(latestCfg)) {
+            api.logger.info('[boss-pig-plugin] skipped alert during quiet hours');
+            return;
+          }
+
           const result = await runCheck(api, latestCfg, stateFile);
           if (!result?.alerted) return;
 
