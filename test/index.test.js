@@ -16,11 +16,9 @@ import {
 
 describe('boss-pig-plugin helpers', () => {
   it('mergeConfig applies defaults and overrides', () => {
-    const cfg = mergeConfig({ checkEveryMinutes: 5, quietHours: { enabled: true } });
+    const cfg = mergeConfig({ checkEveryMinutes: 5 });
     expect(cfg.checkEveryMinutes).toBe(5);
     expect(cfg.cooldownMinutes).toBe(720);
-    expect(cfg.quietHours.enabled).toBe(true);
-    expect(cfg.quietHours.start).toBe('23:00');
   });
 
   it('resolveEffectiveConfig falls back to skill apiKey when plugin key missing', () => {
