@@ -147,12 +147,8 @@ export async function saveJson(filePath, value) {
 export function shouldAlertTask(task, prev, nowMs, cooldownMs) {
   if (!prev) return true;
 
-  // Alert triggers: reschedule change OR bucket crossing (once per bucket).
-  // No cooldown needed - buckets provide natural escalation timing.
+  // Alert triggers: reschedule change only. No bucket trigger.
   if ((task.rescheduleCount || 0) > (prev.lastRescheduleCount || 0)) return true;
-
-  // Bucket change triggers once when crossing into a new bucket.
-  if (overdueBucket(task.minutesOverdue) !== prev.lastBucket) return true;
 
   return false;
 }
