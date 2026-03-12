@@ -105,13 +105,14 @@ On startup or first use:
    - `startIso` and `endIso` must be valid ISO timestamps
 5. Category auto-assignment:
    - If the user explicitly names a category, use it.
-   - Otherwise, before `add_todo` or when preparing a task for scheduling, call `list_categories` and choose the best existing category from:
+   - Otherwise, before `add_todo` or when preparing a task for scheduling, call `list_categories` and choose the best existing category from the real available category list using:
      - task title
      - task notes
      - recent conversation context
      - obvious category-name/emoji matches
-   - Auto-assign a category only when the match is strong.
-   - If multiple categories are plausible or confidence is low, ask the user instead of guessing.
+   - Default to assigning the best existing category when there is a reasonable fit.
+   - Do not ask "should I add a category" or leave the task uncategorized if an existing category is a sensible match.
+   - Only ask the user if no existing category fits well, or if multiple existing categories are genuinely close and the choice is materially ambiguous.
    - Prefer existing categories; do not invent/create a new category unless the user explicitly asks.
 6. Reschedule counting policy:
    - `schedule_todo`/`reschedule_todo` defaults `countAsReschedule=true`
