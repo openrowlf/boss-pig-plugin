@@ -172,10 +172,12 @@ export async function saveJson(filePath, value) {
 export function shouldAlertTask(task, prev, nowMs, cooldownMs) {
   if (!prev) return true;
 
-  // Alert triggers: reschedule change only. No bucket trigger.
-  if ((task.rescheduleCount || 0) > (prev.lastRescheduleCount || 0)) return true;
+  const lastAlertAt = Number(prev.lastAlertAt || 0);
+  if (!lastAlertAt) return true;
 
-  return false;
+  // Re-alert only after the per-task cooldown expires.
+  // This gives a steady "do or reschedule" nudge cadence without spamming.
+  return (nowMs - lastAlertAt) >= cooldownMs;
 }
 
 export async function fetchOverdue({ mcpUrl, apiKey }) {
