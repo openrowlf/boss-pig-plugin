@@ -33,11 +33,14 @@ openclaw plugins install @openrowlf/openclaw-plugin-boss-pig
 
 ## Configure
 
+Boss Pig now treats the plugin config as the canonical source of truth for MCP auth and endpoint.
+Configure `apiKey` and `mcpUrl` here and do not duplicate them in `skills.entries.boss-pig`.
+
 ```json
 {
   "plugins": {
     "entries": {
-      "boss-pig-plugin": {
+      "boss-pig": {
         "enabled": true,
         "config": {
           "enabled": true,

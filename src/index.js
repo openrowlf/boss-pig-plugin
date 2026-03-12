@@ -25,29 +25,9 @@ export function mergeConfig(raw = {}) {
 export function resolveEffectiveConfig(baseCfg, globalCfg = null) {
   const globalPluginCfg = globalCfg?.plugins?.entries?.['boss-pig']?.config || {};
   const cfg = mergeConfig({ ...(baseCfg || {}), ...(globalPluginCfg || {}) });
-  const skill = globalCfg?.skills?.entries?.['boss-pig'] || null;
 
-  if (!cfg.apiKey && skill?.apiKey) {
-    cfg.apiKey = skill.apiKey;
-    cfg.__apiKeySource = 'skills.entries.boss-pig.apiKey';
-  } else if (cfg.apiKey) {
-    cfg.__apiKeySource = 'plugins.entries.boss-pig.config.apiKey';
-  }
-
-  if (!cfg.mcpUrl && skill?.env?.BOSS_PIG_MCP_URL) {
-    cfg.mcpUrl = skill.env.BOSS_PIG_MCP_URL;
-    cfg.__mcpUrlSource = 'skills.entries.boss-pig.env.BOSS_PIG_MCP_URL';
-  } else {
-    cfg.__mcpUrlSource = 'plugins.entries.boss-pig.config.mcpUrl';
-  }
-
-  const pluginKey = String(baseCfg?.apiKey || '').trim();
-  const skillKey = String(skill?.apiKey || '').trim();
-  cfg.__keyDrift = {
-    pluginPresent: !!pluginKey,
-    skillPresent: !!skillKey,
-    mismatch: !!pluginKey && !!skillKey && pluginKey !== skillKey,
-  };
+  cfg.__apiKeySource = cfg.apiKey ? 'plugins.entries.boss-pig.config.apiKey' : null;
+  cfg.__mcpUrlSource = 'plugins.entries.boss-pig.config.mcpUrl';
 
   return cfg;
 }
@@ -305,7 +285,6 @@ export default function register(api) {
         checkEveryMinutes: cfg.checkEveryMinutes,
         cooldownMinutes: cfg.cooldownMinutes,
         apiKeySource: cfg.__apiKeySource || null,
-        keyDrift: cfg.__keyDrift,
       },
       state,
     });
@@ -342,13 +321,8 @@ export default function register(api) {
         api.logger.info('[boss-pig-plugin] disabled');
         return;
       }
-      if (cfg.__keyDrift?.mismatch) {
-        api.logger.warn('[boss-pig-plugin] apiKey mismatch between plugin config and skills.entries.boss-pig.apiKey');
-      } else if (cfg.__keyDrift?.pluginPresent && !cfg.__keyDrift?.skillPresent) {
-        api.logger.warn('[boss-pig-plugin] plugin apiKey is set but skills.entries.boss-pig.apiKey is empty (subagent skill calls may fail)');
-      }
       if (!cfg.apiKey) {
-        api.logger.warn('[boss-pig-plugin] missing apiKey (plugin config or skills fallback); service idle');
+        api.logger.warn('[boss-pig-plugin] missing apiKey in plugins.entries.boss-pig.config.apiKey; service idle');
         return;
       }
       if (!cfg.agentId) {

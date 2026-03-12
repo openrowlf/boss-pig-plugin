@@ -21,26 +21,28 @@ describe('boss-pig-plugin helpers', () => {
     expect(cfg.cooldownMinutes).toBe(720);
   });
 
-  it('resolveEffectiveConfig falls back to skill apiKey when plugin key missing', () => {
+  it('resolveEffectiveConfig uses plugin config as canonical source', () => {
     const cfg = resolveEffectiveConfig(
-      { mcpUrl: 'https://bosspig.moi/mcp' },
-      { skills: { entries: { 'boss-pig': { apiKey: 'bp_skill' } } } },
+      { apiKey: 'bp_plugin', mcpUrl: 'https://bosspig.moi/mcp' },
+      { skills: { entries: { 'boss-pig': { apiKey: 'bp_skill', env: { BOSS_PIG_MCP_URL: 'http://localhost:8787/mcp' } } } } },
     );
 
-    expect(cfg.apiKey).toBe('bp_skill');
-    expect(cfg.__apiKeySource).toBe('skills.entries.boss-pig.apiKey');
-    expect(cfg.__keyDrift.pluginPresent).toBe(false);
-    expect(cfg.__keyDrift.skillPresent).toBe(true);
+    expect(cfg.apiKey).toBe('bp_plugin');
+    expect(cfg.mcpUrl).toBe('https://bosspig.moi/mcp');
+    expect(cfg.__apiKeySource).toBe('plugins.entries.boss-pig.config.apiKey');
+    expect(cfg.__mcpUrlSource).toBe('plugins.entries.boss-pig.config.mcpUrl');
   });
 
-  it('resolveEffectiveConfig marks drift when plugin and skill keys differ', () => {
+  it('resolveEffectiveConfig does not fall back to skill config', () => {
     const cfg = resolveEffectiveConfig(
-      { apiKey: 'bp_plugin' },
-      { skills: { entries: { 'boss-pig': { apiKey: 'bp_skill' } } } },
+      { mcpUrl: 'https://bosspig.moi/mcp' },
+      { skills: { entries: { 'boss-pig': { apiKey: 'bp_skill', env: { BOSS_PIG_MCP_URL: 'http://localhost:8787/mcp' } } } } },
     );
 
-    expect(cfg.__apiKeySource).toBe('plugins.entries.boss-pig.config.apiKey');
-    expect(cfg.__keyDrift.mismatch).toBe(true);
+    expect(cfg.apiKey).toBeUndefined();
+    expect(cfg.mcpUrl).toBe('https://bosspig.moi/mcp');
+    expect(cfg.__apiKeySource).toBe(null);
+    expect(cfg.__mcpUrlSource).toBe('plugins.entries.boss-pig.config.mcpUrl');
   });
 
   it('severityFor maps counts correctly', () => {
@@ -65,7 +67,7 @@ describe('boss-pig-plugin helpers', () => {
     expect(text).toContain('B');
   });
 
-  it('shouldAlertTask triggers on reschedule only', () => {
+  it('shouldAlertTask uses per-task cooldown re-alerts', () => {
     const now = Date.now();
     const prev = {
       lastAlertAt: now - 5 * 60 * 1000,
@@ -74,12 +76,12 @@ describe('boss-pig-plugin helpers', () => {
       lastBucket: 'a',
     };
 
-    // Reschedule change triggers
-    expect(shouldAlertTask({ minutesOverdue: 30, rescheduleCount: 2 }, prev, now, 0)).toBe(true);
-    // Same reschedule count - no trigger (no bucket trigger)
-    expect(shouldAlertTask({ minutesOverdue: 130, rescheduleCount: 1 }, prev, now, 0)).toBe(false);
-    // Same bucket, no reschedule change - no trigger
-    expect(shouldAlertTask({ minutesOverdue: 60, rescheduleCount: 1 }, prev, now, 0)).toBe(false);
+    // Inside cooldown: no repeat alert yet.
+    expect(shouldAlertTask({ minutesOverdue: 130, rescheduleCount: 1 }, prev, now, 10 * 60 * 1000)).toBe(false);
+    // After cooldown: alert again even if reschedule count did not change.
+    expect(shouldAlertTask({ minutesOverdue: 130, rescheduleCount: 1 }, prev, now, 2 * 60 * 1000)).toBe(true);
+    // Missing prior state should always alert.
+    expect(shouldAlertTask({ minutesOverdue: 30, rescheduleCount: 2 }, null, now, 10 * 60 * 1000)).toBe(true);
   });
 });
 

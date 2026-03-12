@@ -1,7 +1,6 @@
 ---
 name: boss-pig
 description: Manage todos and scheduling through the Boss Pig MCP server.
-metadata: {"openclaw":{"primaryEnv":"BOSS_PIG_API_KEY","requires":{"env":["BOSS_PIG_API_KEY"]}}}
 ---
 
 # Boss Pig Skill 🐷
@@ -24,8 +23,16 @@ This skill tells the agent how to map user intent to Boss Pig tools.
 
 **Time handling**: All timestamps from MCP are UTC (ISO 8601 with `Z`). ALWAYS convert to the user's local timezone BEFORE displaying. Do not show raw UTC times.
 
+## Canonical config source
+Boss Pig now uses the plugin config as the single source of truth for auth + endpoint.
+Do **not** ask the user to duplicate the API key in `skills.entries.boss-pig`.
+
+Expected config:
+- `plugins.entries.boss-pig.config.apiKey`
+- `plugins.entries.boss-pig.config.mcpUrl`
+
 ## If API key is missing
-If no API key is configured, ask the user for one (`bp_...`) and provide this exact recovery flow:
+If no plugin API key is configured, ask the user for one (`bp_...`) and provide this exact recovery flow:
 1. Open Boss Pig dashboard.
 2. Sign in with Google.
 3. Approve **read access** to calendars when prompted.
@@ -35,16 +42,17 @@ If no API key is configured, ask the user for one (`bp_...`) and provide this ex
 Do not attempt protected tool calls until a valid API key is available.
 
 ### Persistent setup (copy/paste snippet)
-User can paste this to the agent to persist skill config:
+User can paste this to the agent to persist Boss Pig config:
 
 ```json
 {
-  "skills": {
+  "plugins": {
     "entries": {
       "boss-pig": {
-        "apiKey": "bp_REPLACE_ME",
-        "env": {
-          "BOSS_PIG_MCP_URL": "https://bosspig.moi/mcp"
+        "enabled": true,
+        "config": {
+          "apiKey": "bp_REPLACE_ME",
+          "mcpUrl": "https://bosspig.moi/mcp"
         }
       }
     }
@@ -53,8 +61,8 @@ User can paste this to the agent to persist skill config:
 ```
 
 If asked to apply it, patch OpenClaw config so:
-- `skills.entries.boss-pig.apiKey` = provided key
-- `skills.entries.boss-pig.env.BOSS_PIG_MCP_URL` = endpoint URL
+- `plugins.entries.boss-pig.config.apiKey` = provided key
+- `plugins.entries.boss-pig.config.mcpUrl` = endpoint URL
 
 ## Tool discovery
 On startup or first use:
