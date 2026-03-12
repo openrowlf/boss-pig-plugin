@@ -103,11 +103,21 @@ On startup or first use:
 3. `update_todo` must not be used for time changes.
 4. For schedule actions, require explicit time window:
    - `startIso` and `endIso` must be valid ISO timestamps
-5. Reschedule counting policy:
+5. Category auto-assignment:
+   - If the user explicitly names a category, use it.
+   - Otherwise, before `add_todo` or when preparing a task for scheduling, call `list_categories` and choose the best existing category from:
+     - task title
+     - task notes
+     - recent conversation context
+     - obvious category-name/emoji matches
+   - Auto-assign a category only when the match is strong.
+   - If multiple categories are plausible or confidence is low, ask the user instead of guessing.
+   - Prefer existing categories; do not invent/create a new category unless the user explicitly asks.
+6. Reschedule counting policy:
    - `schedule_todo`/`reschedule_todo` defaults `countAsReschedule=true`
    - Use `countAsReschedule=false` only for immediate correction/misinterpretation fixes
-6. After any mutation, summarize what changed.
-7. If auth fails:
+7. After any mutation, summarize what changed, including category assignment when relevant.
+8. If auth fails:
    - tell user to regenerate API key or reconnect login in dashboard.
 
 ## Response style
