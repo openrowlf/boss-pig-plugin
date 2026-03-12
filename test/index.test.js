@@ -21,27 +21,27 @@ describe('boss-pig-plugin helpers', () => {
     expect(cfg.cooldownMinutes).toBe(720);
   });
 
-  it('resolveEffectiveConfig uses plugin config as canonical source', () => {
+  it('resolveEffectiveConfig prefers skill config as canonical source', () => {
     const cfg = resolveEffectiveConfig(
       { apiKey: 'bp_plugin', mcpUrl: 'https://bosspig.moi/mcp' },
       { skills: { entries: { 'boss-pig': { apiKey: 'bp_skill', env: { BOSS_PIG_MCP_URL: 'http://localhost:8787/mcp' } } } } },
     );
 
+    expect(cfg.apiKey).toBe('bp_skill');
+    expect(cfg.mcpUrl).toBe('http://localhost:8787/mcp');
+    expect(cfg.__apiKeySource).toBe('skills.entries.boss-pig.apiKey');
+    expect(cfg.__mcpUrlSource).toBe('skills.entries.boss-pig.env.BOSS_PIG_MCP_URL');
+  });
+
+  it('resolveEffectiveConfig falls back to plugin config when skill config is absent', () => {
+    const cfg = resolveEffectiveConfig(
+      { apiKey: 'bp_plugin', mcpUrl: 'https://bosspig.moi/mcp' },
+      {},
+    );
+
     expect(cfg.apiKey).toBe('bp_plugin');
     expect(cfg.mcpUrl).toBe('https://bosspig.moi/mcp');
     expect(cfg.__apiKeySource).toBe('plugins.entries.boss-pig.config.apiKey');
-    expect(cfg.__mcpUrlSource).toBe('plugins.entries.boss-pig.config.mcpUrl');
-  });
-
-  it('resolveEffectiveConfig does not fall back to skill config', () => {
-    const cfg = resolveEffectiveConfig(
-      { mcpUrl: 'https://bosspig.moi/mcp' },
-      { skills: { entries: { 'boss-pig': { apiKey: 'bp_skill', env: { BOSS_PIG_MCP_URL: 'http://localhost:8787/mcp' } } } } },
-    );
-
-    expect(cfg.apiKey).toBeUndefined();
-    expect(cfg.mcpUrl).toBe('https://bosspig.moi/mcp');
-    expect(cfg.__apiKeySource).toBe(null);
     expect(cfg.__mcpUrlSource).toBe('plugins.entries.boss-pig.config.mcpUrl');
   });
 

@@ -24,10 +24,25 @@ export function mergeConfig(raw = {}) {
 
 export function resolveEffectiveConfig(baseCfg, globalCfg = null) {
   const globalPluginCfg = globalCfg?.plugins?.entries?.['boss-pig']?.config || {};
+  const skill = globalCfg?.skills?.entries?.['boss-pig'] || null;
+
   const cfg = mergeConfig({ ...(baseCfg || {}), ...(globalPluginCfg || {}) });
 
-  cfg.__apiKeySource = cfg.apiKey ? 'plugins.entries.boss-pig.config.apiKey' : null;
-  cfg.__mcpUrlSource = 'plugins.entries.boss-pig.config.mcpUrl';
+  if (skill?.apiKey) {
+    cfg.apiKey = skill.apiKey;
+    cfg.__apiKeySource = 'skills.entries.boss-pig.apiKey';
+  } else if (cfg.apiKey) {
+    cfg.__apiKeySource = 'plugins.entries.boss-pig.config.apiKey';
+  } else {
+    cfg.__apiKeySource = null;
+  }
+
+  if (skill?.env?.BOSS_PIG_MCP_URL) {
+    cfg.mcpUrl = skill.env.BOSS_PIG_MCP_URL;
+    cfg.__mcpUrlSource = 'skills.entries.boss-pig.env.BOSS_PIG_MCP_URL';
+  } else {
+    cfg.__mcpUrlSource = 'plugins.entries.boss-pig.config.mcpUrl';
+  }
 
   return cfg;
 }
