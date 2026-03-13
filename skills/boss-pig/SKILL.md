@@ -96,28 +96,29 @@ On startup or first use:
 - “summary of schedule” → `get_schedule_summary`
 
 ## Behavior rules
-1. Prefer reading current state before mutating:
-   - list first, then update/schedule
-2. Confirm ambiguous changes:
-   - if multiple matching todos, ask which one
-3. `update_todo` must not be used for time changes.
-4. For schedule actions, require explicit time window:
-   - `startIso` and `endIso` must be valid ISO timestamps
-5. Category auto-assignment:
-   - If the user explicitly names a category, use it.
-   - Otherwise, before `add_todo` or when preparing a task for scheduling, call `list_categories` and choose the best existing category from the real available category list using:
+1. Category-first preflight for add/schedule actions:
+   - If user explicitly names a category, use it.
+   - Otherwise, before `add_todo` or before scheduling an uncategorized task, call `list_categories` and select the best existing category from:
      - task title
      - task notes
      - recent conversation context
      - obvious category-name/emoji matches
    - Default to assigning the best existing category when there is a reasonable fit.
-   - Do not ask "should I add a category" or leave the task uncategorized if an existing category is a sensible match.
-   - Only ask the user if no existing category fits well, or if multiple existing categories are genuinely close and the choice is materially ambiguous.
-   - Prefer existing categories; do not invent/create a new category unless the user explicitly asks.
+   - Do not ask "should I add a category" or leave uncategorized if an existing category is sensible.
+   - Only ask user when no existing category fits, or when multiple existing categories are genuinely tied.
+   - Prefer existing categories; do not create a new category unless user explicitly asks.
+   - Do not skip category lookup because of memory or prior context.
+2. Prefer reading current state before mutating:
+   - list first, then update/schedule
+3. Confirm ambiguous changes:
+   - if multiple matching todos, ask which one
+4. `update_todo` must not be used for time changes.
+5. For schedule actions, require explicit time window:
+   - `startIso` and `endIso` must be valid ISO timestamps
 6. Reschedule counting policy:
    - `schedule_todo`/`reschedule_todo` defaults `countAsReschedule=true`
    - Use `countAsReschedule=false` only for immediate correction/misinterpretation fixes
-7. After any mutation, summarize what changed, including category assignment when relevant.
+7. After any mutation, summarize what changed, including category assignment.
 8. If auth fails:
    - tell user to regenerate API key or reconnect login in dashboard.
 
@@ -153,6 +154,21 @@ On startup or first use:
   }
 }
 ```
+
+## Full workflow examples
+
+### Add + categorize + schedule (default path)
+1. `add_todo` (capture created `id`)
+2. `list_categories`
+3. `update_todo` with chosen `categoryId`
+4. `schedule_todo` with `startIso`/`endIso`
+5. Reply with title, category chosen, and schedule
+
+### Schedule existing task with missing category
+1. `list_todos` (find target task)
+2. If task has no category: `list_categories` then `update_todo` with `categoryId`
+3. `schedule_todo`
+4. Reply with what changed, including category
 
 ## Safety notes
 - Never fabricate tool outputs.
