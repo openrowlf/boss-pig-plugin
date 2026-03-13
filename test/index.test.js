@@ -67,7 +67,7 @@ describe('boss-pig-plugin helpers', () => {
     expect(text).toContain('B');
   });
 
-  it('shouldAlertTask uses per-task cooldown re-alerts', () => {
+  it('shouldAlertTask re-alerts immediately on reschedule increase, else uses cooldown', () => {
     const now = Date.now();
     const prev = {
       lastAlertAt: now - 5 * 60 * 1000,
@@ -76,8 +76,10 @@ describe('boss-pig-plugin helpers', () => {
       lastBucket: 'a',
     };
 
-    // Inside cooldown: no repeat alert yet.
+    // Inside cooldown: no repeat alert yet when unchanged.
     expect(shouldAlertTask({ minutesOverdue: 130, rescheduleCount: 1 }, prev, now, 10 * 60 * 1000)).toBe(false);
+    // Reschedule increased: alert immediately, even inside cooldown.
+    expect(shouldAlertTask({ minutesOverdue: 10, rescheduleCount: 2 }, prev, now, 10 * 60 * 1000)).toBe(true);
     // After cooldown: alert again even if reschedule count did not change.
     expect(shouldAlertTask({ minutesOverdue: 130, rescheduleCount: 1 }, prev, now, 2 * 60 * 1000)).toBe(true);
     // Missing prior state should always alert.

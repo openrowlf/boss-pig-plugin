@@ -167,6 +167,13 @@ export async function saveJson(filePath, value) {
 export function shouldAlertTask(task, prev, nowMs, cooldownMs) {
   if (!prev) return true;
 
+  const currentReschedules = Number(task?.rescheduleCount || 0);
+  const previousReschedules = Number(prev?.lastRescheduleCount || 0);
+
+  // A reschedule-count increase indicates a new overdue cycle.
+  // Allow immediate alert instead of waiting for prior cooldown.
+  if (currentReschedules > previousReschedules) return true;
+
   const lastAlertAt = Number(prev.lastAlertAt || 0);
   if (!lastAlertAt) return true;
 
