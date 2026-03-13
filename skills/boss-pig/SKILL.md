@@ -22,7 +22,11 @@ This skill tells the agent how to map user intent to Boss Pig tools.
 
 **Environment rule**: Use production by default. Only use localhost/dev endpoints if the user explicitly asks for dev mode.
 
-**Time handling**: All timestamps from MCP are UTC (ISO 8601 with `Z`). ALWAYS convert to the user's local timezone BEFORE displaying. Do not show raw UTC times.
+**Time handling**: Boss Pig MCP timestamps are UTC (ISO 8601 with `Z`).
+- ALWAYS convert UTC -> user's local timezone BEFORE displaying.
+- For user-entered times (e.g., "today at 8", "tonight", "tomorrow morning"), interpret in the user's local timezone first (default: America/Chicago unless user says otherwise), then convert to UTC for `schedule_todo`/`reschedule_todo`.
+- Never treat ambiguous natural-language times as UTC by default.
+- In confirmations, show local time (and optionally UTC in parentheses only when useful).
 
 ## Canonical config source
 Boss Pig uses the skill config as the single source of truth for auth + endpoint.
@@ -115,6 +119,8 @@ On startup or first use:
 4. `update_todo` must not be used for time changes.
 5. For schedule actions, require explicit time window:
    - `startIso` and `endIso` must be valid ISO timestamps
+   - Build those ISO timestamps from the user's local timezone intent (America/Chicago by default), then convert to UTC before calling MCP.
+   - If user time is vague and cannot be resolved confidently (e.g., "later"), ask one clarifying question before scheduling.
 6. Reschedule counting policy:
    - `schedule_todo`/`reschedule_todo` defaults `countAsReschedule=true`
    - Use `countAsReschedule=false` only for immediate correction/misinterpretation fixes
@@ -143,17 +149,18 @@ On startup or first use:
 ```
 
 ### Schedule todo
-`tools/call` with:
+`tools/call` with (UTC payload derived from local user intent):
 ```json
 {
   "name": "schedule_todo",
   "arguments": {
     "id": "<todo-id>",
-    "startIso": "2026-03-02T15:00:00.000Z",
-    "endIso": "2026-03-02T15:30:00.000Z"
+    "startIso": "2026-03-03T03:00:00.000Z",
+    "endIso": "2026-03-03T03:30:00.000Z"
   }
 }
 ```
+Example: "Mar 2 at 9:00 PM America/Chicago" → `03:00Z` (next day).
 
 ## Full workflow examples
 
