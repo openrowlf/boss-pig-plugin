@@ -6,6 +6,7 @@ describe('plugin registration', () => {
     const registerGatewayMethod = vi.fn();
     const registerCommand = vi.fn();
     const registerService = vi.fn();
+    const registerTool = vi.fn();
 
     const api = {
       entry: { config: { apiKey: 'bp_test', mcpUrl: 'https://bosspig.moi/mcp' } },
@@ -19,12 +20,16 @@ describe('plugin registration', () => {
       registerGatewayMethod,
       registerCommand,
       registerService,
+      registerTool,
     };
 
     register(api);
 
     expect(registerGatewayMethod).toHaveBeenCalledTimes(1);
     expect(registerGatewayMethod.mock.calls[0][0]).toBe('bosspig.status');
+
+    expect(registerTool).toHaveBeenCalledTimes(14);
+    expect(registerTool.mock.calls[0][0].name).toBe('boss_pig_list_todos');
 
     expect(registerCommand).toHaveBeenCalledTimes(0);
 
@@ -45,6 +50,7 @@ describe('plugin registration', () => {
       registerGatewayMethod: vi.fn(),
       registerCommand,
       registerService: vi.fn(),
+      registerTool: vi.fn(),
     };
 
     register(api);
@@ -63,6 +69,7 @@ describe('plugin registration', () => {
       registerGatewayMethod: vi.fn(),
       registerCommand: vi.fn(),
       registerService,
+      registerTool: vi.fn(),
     };
 
     register(apiDisabled);
@@ -78,6 +85,7 @@ describe('plugin registration', () => {
       registerGatewayMethod: vi.fn(),
       registerCommand: vi.fn(),
       registerService: registerService2,
+      registerTool: vi.fn(),
     };
 
     register(apiNoKey);

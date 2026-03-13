@@ -3,6 +3,7 @@
   "name": "Boss Pig Plugin",
   "version": "0.1.0",
   "description": "Periodic overdue task checks for Boss Pig MCP with cooldown state.",
+  "skills": ["skills"],
   "configSchema": {
     "type": "object",
     "additionalProperties": false,

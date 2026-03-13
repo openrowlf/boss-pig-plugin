@@ -22,8 +22,9 @@ After install, keep this skill available in your agent skill discovery paths (or
 - Registers:
   - Gateway method: `bosspig.status`
   - Command: `/bosspig-check` (optional via `manualCommandEnabled: true`)
+  - Agent tools: `boss_pig_*` wrappers for core Boss Pig MCP methods
 
-> Note: v0.1 writes automatic alerts to plugin logs and state. Command `/bosspig-check` returns the current alert text for manual checks.
+> Note: v0.1 supports session-event nudges and optional direct delivery fallback. Command `/bosspig-check` returns the current alert text for manual checks.
 
 ## Install
 
@@ -33,11 +34,21 @@ openclaw plugins install @openrowlf/openclaw-plugin-boss-pig
 
 ## Configure
 
-Boss Pig now treats the plugin config as the canonical source of truth for MCP auth and endpoint.
-Configure `apiKey` and `mcpUrl` here and do not duplicate them in `skills.entries.boss-pig`.
+Use `skills.entries.boss-pig` as the canonical auth source (for interactive skill + plugin).
+Plugin config still controls cadence/delivery behavior.
 
 ```json
 {
+  "skills": {
+    "entries": {
+      "boss-pig": {
+        "apiKey": "bp_REPLACE_ME",
+        "env": {
+          "BOSS_PIG_MCP_URL": "https://bosspig.moi/mcp"
+        }
+      }
+    }
+  },
   "plugins": {
     "entries": {
       "boss-pig": {
@@ -46,11 +57,9 @@ Configure `apiKey` and `mcpUrl` here and do not duplicate them in `skills.entrie
           "enabled": true,
           "agentId": "bosspig",
           "delivery": {
-            "channel": "telegram",
-            "to": "8588367868"
+            "channel": "",
+            "to": ""
           },
-          "mcpUrl": "https://bosspig.moi/mcp",
-          "apiKey": "bp_REPLACE_ME",
           "checkEveryMinutes": 15,
           "cooldownMinutes": 720,
           "maxItems": 3,
@@ -77,6 +86,27 @@ Restart gateway after config changes.
 ## Gateway method
 
 - `bosspig.status` – inspect plugin config + state
+
+## Plugin tools (`boss_pig_*`)
+
+This plugin registers agent tools that wrap MCP methods:
+
+- `boss_pig_list_todos`
+- `boss_pig_list_scheduled_todos`
+- `boss_pig_list_overdue_todos`
+- `boss_pig_list_categories`
+- `boss_pig_create_category`
+- `boss_pig_update_category`
+- `boss_pig_add_todo`
+- `boss_pig_update_todo`
+- `boss_pig_schedule_todo`
+- `boss_pig_reschedule_todo`
+- `boss_pig_find_open_slots`
+- `boss_pig_list_selected_calendars`
+- `boss_pig_get_upcoming_events`
+- `boss_pig_get_schedule_summary`
+
+These tools are available when the plugin is enabled.
 
 ## State file
 

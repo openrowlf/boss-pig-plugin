@@ -175,14 +175,14 @@ export function shouldAlertTask(task, prev, nowMs, cooldownMs) {
   return (nowMs - lastAlertAt) >= cooldownMs;
 }
 
-export async function fetchOverdue({ mcpUrl, apiKey }) {
+export async function callMcpTool({ mcpUrl, apiKey }, name, args = {}) {
   const body = {
     jsonrpc: '2.0',
     id: 1,
     method: 'tools/call',
     params: {
-      name: 'list_overdue_todos',
-      arguments: {},
+      name,
+      arguments: args || {},
     },
   };
 
@@ -200,7 +200,12 @@ export async function fetchOverdue({ mcpUrl, apiKey }) {
   }
 
   const data = await res.json();
-  const text = data?.result?.content?.[0]?.text;
+  return data?.result?.content ?? [];
+}
+
+export async function fetchOverdue({ mcpUrl, apiKey }) {
+  const content = await callMcpTool({ mcpUrl, apiKey }, 'list_overdue_todos', {});
+  const text = content?.[0]?.text;
   if (!text) return [];
 
   const parsed = JSON.parse(text);
@@ -287,6 +292,50 @@ export default function register(api) {
     : process.cwd();
   const stateFile = path.join(stateDir, 'boss-pig-plugin', 'overdue-alert-state.json');
 
+  const bossPigTools = [
+    'list_todos',
+    'list_scheduled_todos',
+    'list_overdue_todos',
+    'list_categories',
+    'create_category',
+    'update_category',
+    'add_todo',
+    'update_todo',
+    'schedule_todo',
+    'reschedule_todo',
+    'find_open_slots',
+    'list_selected_calendars',
+    'get_upcoming_events',
+    'get_schedule_summary',
+  ];
+
+  for (const toolName of bossPigTools) {
+    api.registerTool({
+      name: `boss_pig_${toolName}`,
+      description: `Boss Pig MCP: ${toolName}`,
+      parameters: {
+        type: 'object',
+        properties: {
+          arguments: {
+            type: 'object',
+            description: `Arguments for Boss Pig MCP tool \"${toolName}\"`,
+            additionalProperties: true,
+          },
+        },
+        additionalProperties: false,
+      },
+      async execute(_id, params) {
+        const cfg = getCfg();
+        if (!cfg?.apiKey) throw new Error('Boss Pig API key is missing (skills.entries.boss-pig.apiKey)');
+        if (!cfg?.mcpUrl) throw new Error('Boss Pig MCP URL is missing (skills.entries.boss-pig.env.BOSS_PIG_MCP_URL)');
+
+        const content = await callMcpTool(cfg, toolName, params?.arguments || {});
+        if (Array.isArray(content) && content.length) return { content };
+        return { content: [{ type: 'text', text: 'OK' }] };
+      },
+    });
+  }
+
   api.registerGatewayMethod('bosspig.status', async ({ respond }) => {
     const cfg = getCfg();
     const state = await loadJson(stateFile, { tasks: {}, lastAlert: null, lastError: null });
@@ -337,7 +386,7 @@ export default function register(api) {
         return;
       }
       if (!cfg.apiKey) {
-        api.logger.warn('[boss-pig-plugin] missing apiKey in plugins.entries.boss-pig.config.apiKey; service idle');
+        api.logger.warn('[boss-pig-plugin] missing apiKey in skills.entries.boss-pig.apiKey; service idle');
         return;
       }
       if (!cfg.agentId) {
