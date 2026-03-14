@@ -11,6 +11,8 @@ const DEFAULTS = {
   cooldownMinutes: 720,
   maxItems: 3,
   manualCommandEnabled: false,
+  backlogNudgeEnabled: true,
+  backlogMaxItems: 3,
 };
 
 export function mergeConfig(raw = {}) {
@@ -124,6 +126,16 @@ function buildSystemEventText(payload) {
   ].join('\n\n');
 }
 
+function localDateKey(timeZone = 'UTC') {
+  const fmt = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+  return fmt.format(new Date());
+}
+
 async function sendFallbackMessage(api, cfg, text) {
   const ch = String(cfg?.delivery?.channel || '').toLowerCase();
   const to = String(cfg?.delivery?.to || '').trim();
@@ -219,10 +231,19 @@ export async function fetchOverdue({ mcpUrl, apiKey }) {
   return Array.isArray(parsed) ? parsed : [];
 }
 
+export async function fetchBacklog({ mcpUrl, apiKey }) {
+  const content = await callMcpTool({ mcpUrl, apiKey }, 'list_todos', { status: 'backlog' });
+  const text = content?.[0]?.text;
+  if (!text) return [];
+
+  const parsed = JSON.parse(text);
+  return Array.isArray(parsed) ? parsed : [];
+}
+
 export async function runCheck(api, cfg, stateFile, opts = {}) {
   const nowMs = Date.now();
   const cooldownMs = cfg.cooldownMinutes * 60 * 1000;
-  const state = await loadJson(stateFile, { tasks: {}, lastAlert: null, lastError: null });
+  const state = await loadJson(stateFile, { tasks: {}, lastAlert: null, lastError: null, backlog: { lastNudgeDate: null } });
 
   const overdue = await fetchOverdue(cfg);
   if (!overdue.length) {
@@ -272,6 +293,50 @@ export async function runCheck(api, cfg, stateFile, opts = {}) {
   }
 
   return { overdueCount: overdue.length, alerted: true, text: alertText, toAlertCount: toAlert.length, payload };
+}
+
+export async function runBacklogCheck(api, cfg, stateFile, opts = {}) {
+  const state = await loadJson(stateFile, { tasks: {}, lastAlert: null, lastError: null, backlog: { lastNudgeDate: null } });
+  const backlog = await fetchBacklog(cfg);
+  if (!backlog.length) return { backlogCount: 0, alerted: false, text: 'No backlog tasks.' };
+
+  const dateKey = opts.dateKey || localDateKey(opts.timeZone || 'UTC');
+  if ((state.backlog?.lastNudgeDate || null) === dateKey) {
+    return { backlogCount: backlog.length, alerted: false, text: `Backlog present (${backlog.length}) but already nudged today.` };
+  }
+
+  const top = backlog.slice(0, Math.max(1, Number(cfg.backlogMaxItems || 3))).map((t) => ({
+    id: t.id,
+    title: t.title,
+    priority: t.priority || 3,
+  }));
+
+  const payload = {
+    type: 'boss_pig.backlog_nudge',
+    version: 1,
+    generatedAt: new Date().toISOString(),
+    summary: {
+      totalBacklog: backlog.length,
+      topCount: top.length,
+    },
+    tasks: top,
+    policy: {
+      oncePerDay: true,
+      dateKey,
+    },
+  };
+
+  const lines = top.map((t) => `• ${t.title}`);
+  const text = [`🗂️ Boss Pig: ${backlog.length} backlog task${backlog.length === 1 ? '' : 's'}`, ...lines].join('\n');
+
+  state.backlog = {
+    lastNudgeDate: dateKey,
+    lastNudgeAt: Date.now(),
+    lastCount: backlog.length,
+  };
+  await saveJson(stateFile, state);
+
+  return { backlogCount: backlog.length, alerted: true, text, payload };
 }
 
 export default function register(api) {
@@ -406,15 +471,6 @@ export default function register(api) {
         try {
           const latestCfg = getCfg();
 
-          const result = await runCheck(api, latestCfg, stateFile);
-          if (!result?.alerted) return;
-
-          // Hybrid delivery: enqueue system event to trigger Piggy, fallback to direct message if that fails.
-          const eventText = buildSystemEventText(result.payload);
-          let delivered = false;
-
-          // Try to enqueue system event for Piggy to pick up via heartbeat
-          // Skip enqueueing if outside active hours - let next active-hour tick generate fresh data
           const globalCfg = loadGlobalConfig();
           const agent = (globalCfg?.agents?.list || []).find(a => a.id === 'bosspig');
           api.logger.info(`[boss-pig-plugin] activeHours config: ${JSON.stringify(agent?.heartbeat?.activeHours)}`);
@@ -425,32 +481,48 @@ export default function register(api) {
             return;
           }
 
-          if (latestCfg.agentId) {
-            try {
-              // Enqueue to main session - heartbeat will wake Piggy with this context
-              const mainKey = `agent:${latestCfg.agentId}:main`;
-              api.runtime.system.enqueueSystemEvent(eventText, {
-                sessionKey: mainKey,
-                contextKey: 'boss-pig-plugin',
-              });
-              // Request immediate heartbeat to process the event
-              api.runtime.system.requestHeartbeatNow({
-                reason: 'boss-pig-plugin-alert',
-                agentId: latestCfg.agentId,
-                sessionKey: mainKey,
-              });
-              delivered = true;
-              api.logger.info(`[boss-pig-plugin] system event enqueued for agent ${latestCfg.agentId}`);
-            } catch (err) {
-              api.logger.warn(`[boss-pig-plugin] system-event bridge failed: ${err?.message || String(err)}`);
+          const deliverPayload = async (payload, reason, fallbackText) => {
+            const eventText = buildSystemEventText(payload);
+            let delivered = false;
+
+            if (latestCfg.agentId) {
+              try {
+                const mainKey = `agent:${latestCfg.agentId}:main`;
+                api.runtime.system.enqueueSystemEvent(eventText, {
+                  sessionKey: mainKey,
+                  contextKey: 'boss-pig-plugin',
+                });
+                api.runtime.system.requestHeartbeatNow({
+                  reason,
+                  agentId: latestCfg.agentId,
+                  sessionKey: mainKey,
+                });
+                delivered = true;
+                api.logger.info(`[boss-pig-plugin] system event enqueued for agent ${latestCfg.agentId}`);
+              } catch (err) {
+                api.logger.warn(`[boss-pig-plugin] system-event bridge failed: ${err?.message || String(err)}`);
+              }
             }
+
+            if (!delivered) {
+              const sent = await sendFallbackMessage(api, latestCfg, fallbackText);
+              if (sent) {
+                api.logger.info(`[boss-pig-plugin] fallback message sent to ${latestCfg.delivery.channel}:${latestCfg.delivery.to}`);
+              }
+            }
+          };
+
+          const overdue = await runCheck(api, latestCfg, stateFile);
+          if (overdue?.alerted) {
+            await deliverPayload(overdue.payload, 'boss-pig-plugin-alert', overdue.text);
+            return; // avoid stacking backlog nudge on same tick as overdue alert
           }
 
-          // Fallback: direct channel message if system event didn't work
-          if (!delivered) {
-            const sent = await sendFallbackMessage(api, latestCfg, result.text);
-            if (sent) {
-              api.logger.info(`[boss-pig-plugin] fallback message sent to ${latestCfg.delivery.channel}:${latestCfg.delivery.to}`);
+          if (latestCfg.backlogNudgeEnabled !== false) {
+            const tz = agent?.heartbeat?.activeHours?.timezone || 'America/Chicago';
+            const backlog = await runBacklogCheck(api, latestCfg, stateFile, { timeZone: tz, dateKey: localDateKey(tz) });
+            if (backlog?.alerted) {
+              await deliverPayload(backlog.payload, 'boss-pig-plugin-backlog', backlog.text);
             }
           }
         } catch (err) {
