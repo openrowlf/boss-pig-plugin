@@ -219,6 +219,11 @@ export async function callMcpTool({ mcpUrl, apiKey }, name, args = {}) {
   }
 
   const data = await res.json();
+  if (data?.error) {
+    const code = data.error?.code;
+    const message = data.error?.message || 'Unknown MCP error';
+    throw new Error(`MCP error ${code ?? 'unknown'}: ${message}`);
+  }
   return data?.result?.content ?? [];
 }
 
@@ -401,7 +406,11 @@ export default function register(api) {
         if (!cfg?.apiKey) throw new Error('Boss Pig API key is missing (skills.entries.boss-pig.apiKey)');
         if (!cfg?.mcpUrl) throw new Error('Boss Pig MCP URL is missing (skills.entries.boss-pig.env.BOSS_PIG_MCP_URL)');
 
-        const content = await callMcpTool(cfg, toolName, params?.arguments || {});
+        const passedArgs = (params && typeof params.arguments === 'object' && params.arguments)
+          ? params.arguments
+          : (params || {});
+
+        const content = await callMcpTool(cfg, toolName, passedArgs);
         if (Array.isArray(content) && content.length) return { content };
         return { content: [{ type: 'text', text: 'OK' }] };
       },

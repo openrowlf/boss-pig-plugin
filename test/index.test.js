@@ -12,6 +12,7 @@ import {
   fetchOverdue,
   runCheck,
   loadJson,
+  callMcpTool,
 } from '../src/index.js';
 
 describe('boss-pig-plugin helpers', () => {
@@ -136,5 +137,17 @@ describe('boss-pig-plugin network + state', () => {
     const saved = await loadJson(stateFile, null);
     expect(saved.tasks['1']).toBeTruthy();
     expect(saved.tasks['1'].lastSeverity).toBe('firm');
+  });
+
+  it('callMcpTool throws on JSON-RPC error payloads', async () => {
+    global.fetch = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        error: { code: 400, message: 'id, startIso, endIso required' },
+      }),
+    }));
+
+    await expect(callMcpTool({ mcpUrl: 'http://x/mcp', apiKey: 'bp_x' }, 'reschedule_todo', {}))
+      .rejects.toThrow('MCP error 400: id, startIso, endIso required');
   });
 });
