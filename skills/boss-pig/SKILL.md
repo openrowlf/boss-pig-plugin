@@ -89,6 +89,16 @@ On startup or first use:
 - `create_category`
 - `update_category`
 - `delete_category`
+- `list_interests`
+- `create_interest`
+- `update_interest`
+- `delete_interest`
+- `list_goals`
+- `create_goal`
+- `update_goal`
+- `delete_goal`
+- `add_todo_from_research`
+- `list_research_findings`
 
 ## Intent → tool mapping
 - "add task / todo" → `add_todo`
@@ -103,6 +113,14 @@ On startup or first use:
 - "what calendars are selected" → `list_selected_calendars`
 - "what's coming up" → `get_upcoming_events`
 - "summary of schedule" → `get_schedule_summary`
+- "I'm interested in / I want to research" → `create_interest`
+- "show my interests" → `list_interests`
+- "remove / stop researching" → `delete_interest`
+- "I want to achieve / I have a goal" → `create_goal`
+- "show my goals" → `list_goals`
+- "update / complete / abandon goal" → `update_goal`
+- "show research findings" → `list_research_findings`
+- "add this as a task from research" → `add_todo_from_research`
 
 ## Behavior rules
 1. Category-first preflight for add/schedule actions:
@@ -145,7 +163,54 @@ On startup or first use:
 
 ## Example MCP calls
 
-### Add todo
+### Add research interest
+```json
+{
+  "name": "create_interest",
+  "arguments": {
+    "title": "Backyard gardening",
+    "keywords": "raised bed, partial shade, vegetables, soil mix",
+    "frequency": "daily"
+  }
+}
+```
+
+### Add goal (optionally linked to an interest)
+```json
+{
+  "name": "create_goal",
+  "arguments": {
+    "title": "Walk 3x per week",
+    "targetMetric": "3x/week",
+    "interestId": "<optional-interest-id>"
+  }
+}
+```
+
+### Add todo from research finding
+```json
+{
+  "name": "add_todo_from_research",
+  "arguments": {
+    "title": "Look into: Best soil mix for raised beds",
+    "notes": "https://example.com/article",
+    "interestId": "<interest-id>",
+    "researchUrl": "https://example.com/article",
+    "researchSource": "web",
+    "priority": 3
+  }
+}
+```
+
+### List research findings
+```json
+{
+  "name": "list_research_findings",
+  "arguments": {
+    "interestId": "<optional-interest-id>"
+  }
+}
+```
 `tools/call` with:
 ```json
 {
