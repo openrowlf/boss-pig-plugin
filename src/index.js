@@ -376,6 +376,7 @@ export default function register(api) {
     'list_categories',
     'create_category',
     'update_category',
+    'delete_category',
     'add_todo',
     'update_todo',
     'schedule_todo',
