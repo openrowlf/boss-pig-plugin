@@ -122,6 +122,28 @@ On startup or first use:
 - "show research findings" → `list_research_findings`
 - "add this as a task from research" → `add_todo_from_research`
 
+## Automated research nudge
+
+The Boss Pig plugin fires a `boss_pig.research_nudge` system event once per day (default: 2 AM America/Chicago) when interests are due for research.
+
+When you receive a `BOSS_PIG_PLUGIN_ALERT` with `type: "boss_pig.research_nudge"`:
+1. Parse the `interests` array from the payload
+2. For each interest, use `update_interest` to refresh `lastRunAt` to now (so it won't fire again until next frequency window)
+3. Research the topic deeply — not just a quick search. Use web search to find relevant pages, then **open and read the most promising ones**. Look for:
+   - Specific details, data points, or recommendations (not just titles)
+   - Contradictions or gaps between sources
+   - Recent updates or developments (within the last 6 months preferred)
+   - Actionable steps the user could take right now
+4. Present findings conversationally. For each interest researched, structure your response as:
+   - **What I found** — a synthesized summary of 3-5 key insights (not a list of links)
+   - **Best sources** — 2-3 specific URLs with a one-line note on why each matters
+   - **What to do next** — concrete, actionable items (e.g., "buy Yukon Gold seed potatoes from [local nursery link]")
+5. If anything warrants a task, use `add_todo_from_research` to create it linked to the interest
+
+**Standard Google search is not enough.** Dig into 1-2 pages per interest. Read them. Extract what matters. Synthesize across sources. The goal is insight, not information.
+
+Do not mark `lastRunAt` on interests that were not actually researched (e.g., if you skip a day intentionally).
+
 ## Behavior rules
 1. Category-first preflight for add/schedule actions:
    - If user explicitly names a category, use it.
@@ -140,6 +162,7 @@ On startup or first use:
 3. Confirm ambiguous changes:
    - if multiple matching todos, ask which one
 4. `update_todo` must not be used for time changes.
+   - Valid `status` values for todos: `unscheduled`, `scheduled`, `completed`, `cancelled`, `abandoned`, `trash`
 5. `delete_category` policy:
    - If category has tasks assigned, the API will refuse the delete and return a task count
    - Tell the user: "Category '[name]' has [N] task(s). Reassign them first, or confirm force delete to remove the category from all tasks."

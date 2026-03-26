@@ -13,6 +13,8 @@ const DEFAULTS = {
   manualCommandEnabled: false,
   backlogNudgeEnabled: true,
   backlogMaxItems: 3,
+  researchNudgeEnabled: true,
+  researchCronHour: 2, // 2 AM local time (overnight)
 };
 
 export function mergeConfig(raw = {}) {
@@ -245,6 +247,68 @@ export async function fetchBacklog({ mcpUrl, apiKey }) {
   return Array.isArray(parsed) ? parsed : [];
 }
 
+export async function fetchInterests({ mcpUrl, apiKey }) {
+  const content = await callMcpTool({ mcpUrl, apiKey }, 'list_interests', {});
+  const text = content?.[0]?.text;
+  if (!text) return [];
+
+  const parsed = JSON.parse(text);
+  return Array.isArray(parsed) ? parsed : [];
+}
+
+function isInterestDue(interest) {
+  if (!interest.enabled) return false;
+  const freq = interest.frequency || 'daily';
+  if (freq === 'manual') return false;
+  const lastRun = interest.lastRunAt ? new Date(interest.lastRunAt) : null;
+  const now = new Date();
+  if (!lastRun) return true; // never run
+  if (freq === 'daily') return true;
+  if (freq === 'weekly') {
+    const msPerWeek = 7 * 24 * 60 * 60 * 1000;
+    return (now - lastRun) >= msPerWeek;
+  }
+  return true;
+}
+
+export async function runResearchCheck(api, cfg, stateFile, opts = {}) {
+  const state = await loadJson(stateFile, { tasks: {}, lastAlert: null, lastError: null, research: { lastNudgeDate: null } });
+  const interests = await fetchInterests(cfg);
+  const due = interests.filter(isInterestDue);
+
+  const dateKey = opts.dateKey || localDateKey(opts.timeZone || 'America/Chicago');
+  if (!due.length) {
+    return { researchCount: 0, alerted: false, text: 'No interests due for research.' };
+  }
+
+  // Only nudge once per day
+  if ((state.research?.lastNudgeDate || null) === dateKey) {
+    return { researchCount: due.length, alerted: false, text: 'Research already triggered today.' };
+  }
+
+  const titles = due.map(i => `• ${i.title} (${i.frequency})`);
+  const text = [
+    `🔬 Boss Pig Agent: Time to research ${due.length} interest${due.length === 1 ? '' : 's'}`,
+    ...titles,
+    '',
+    'Use your research tools (list_interests, update_interest) to refresh data for these topics.',
+  ].join('\n');
+
+  const payload = {
+    type: 'boss_pig.research_nudge',
+    version: 1,
+    generatedAt: new Date().toISOString(),
+    summary: { totalDue: due.length },
+    interests: due.map(i => ({ id: i.id, title: i.title, frequency: i.frequency, keywords: i.keywords })),
+    policy: { oncePerDay: true, dateKey },
+  };
+
+  state.research = { lastNudgeDate: dateKey, lastNudgeAt: Date.now() };
+  await saveJson(stateFile, state);
+
+  return { researchCount: due.length, alerted: true, text, payload };
+}
+
 export async function runCheck(api, cfg, stateFile, opts = {}) {
   const nowMs = Date.now();
   const cooldownMs = cfg.cooldownMinutes * 60 * 1000;
@@ -385,6 +449,16 @@ export default function register(api) {
     'list_selected_calendars',
     'get_upcoming_events',
     'get_schedule_summary',
+    'list_interests',
+    'create_interest',
+    'update_interest',
+    'delete_interest',
+    'list_goals',
+    'create_goal',
+    'update_goal',
+    'delete_goal',
+    'add_todo_from_research',
+    'list_research_findings',
   ];
 
   for (const toolName of bossPigTools) {
@@ -449,6 +523,43 @@ export default function register(api) {
           return { text: result.text };
         } catch (err) {
           return { text: `Boss Pig check failed: ${err?.message || String(err)}` };
+        }
+      },
+    });
+
+    api.registerCommand({
+      name: 'bosspig_research',
+      description: 'Trigger Boss Pig research nudge now (bypasses once-per-day lock)',
+      acceptsArgs: false,
+      requireAuth: true,
+      handler: async () => {
+        try {
+          const cfg = getCfg();
+          const globalCfg = loadGlobalConfig();
+          const agent = (globalCfg?.agents?.list || []).find(a => a.id === 'bosspig');
+          const tz = agent?.heartbeat?.activeHours?.timezone || 'America/Chicago';
+          const result = await runResearchCheck(api, cfg, stateFile, {
+            timeZone: tz,
+            dateKey: 'manual-' + Date.now(), // unique key so it always fires
+          });
+          if (result.alerted) {
+            const payload = result.payload;
+            const eventText = buildSystemEventText(payload);
+            const mainKey = `agent:${cfg.agentId}:main`;
+            await api.runtime.system.enqueueSystemEvent(eventText, {
+              sessionKey: mainKey,
+              contextKey: 'boss-pig-plugin',
+            });
+            await api.runtime.system.requestHeartbeatNow({
+              reason: 'bosspig-research-command',
+              agentId: cfg.agentId,
+              sessionKey: mainKey,
+            });
+            return { text: `Research nudge triggered for ${result.researchCount} interest(s). Piggy has been notified.` };
+          }
+          return { text: result.text };
+        } catch (err) {
+          return { text: `Boss Pig research check failed: ${err?.message || String(err)}` };
         }
       },
     });
@@ -533,6 +644,20 @@ export default function register(api) {
             const backlog = await runBacklogCheck(api, latestCfg, stateFile, { timeZone: tz, dateKey: localDateKey(tz) });
             if (backlog?.alerted) {
               await deliverPayload(backlog.payload, 'boss-pig-plugin-backlog', backlog.text);
+            }
+          }
+
+          // Research nudge — once per day at configured hour (default 8 AM local)
+          if (latestCfg.researchNudgeEnabled !== false) {
+            const tz = agent?.heartbeat?.activeHours?.timezone || 'America/Chicago';
+            const nowLocal = new Date().toLocaleTimeString('en-US', { timeZone: tz, hour: '2-digit', hour12: false });
+            const researchHour = Number(latestCfg.researchCronHour ?? 8);
+            const currentHour = Number(nowLocal);
+            if (currentHour === researchHour) {
+              const research = await runResearchCheck(api, latestCfg, stateFile, { timeZone: tz, dateKey: localDateKey(tz) });
+              if (research?.alerted) {
+                await deliverPayload(research.payload, 'boss-pig-plugin-research', research.text);
+              }
             }
           }
         } catch (err) {
