@@ -281,8 +281,8 @@ export async function runResearchCheck(api, cfg, stateFile, opts = {}) {
     return { researchCount: 0, alerted: false, text: 'No interests due for research.' };
   }
 
-  // Only nudge once per day
-  if ((state.research?.lastNudgeDate || null) === dateKey) {
+  // Only nudge once per day (skip if date key already recorded)
+  if (opts.saveState !== false && (state.research?.lastNudgeDate || null) === dateKey) {
     return { researchCount: due.length, alerted: false, text: 'Research already triggered today.' };
   }
 
@@ -303,8 +303,10 @@ export async function runResearchCheck(api, cfg, stateFile, opts = {}) {
     policy: { oncePerDay: true, dateKey },
   };
 
-  state.research = { lastNudgeDate: dateKey, lastNudgeAt: Date.now() };
-  await saveJson(stateFile, state);
+  if (opts.saveState !== false) {
+    state.research = { lastNudgeDate: dateKey, lastNudgeAt: Date.now() };
+    await saveJson(stateFile, state);
+  }
 
   return { researchCount: due.length, alerted: true, text, payload };
 }
@@ -541,6 +543,7 @@ export default function register(api) {
           const result = await runResearchCheck(api, cfg, stateFile, {
             timeZone: tz,
             dateKey: 'manual-' + Date.now(), // unique key so it always fires
+            saveState: false, // don't touch the auto-run state
           });
           if (result.alerted) {
             const payload = result.payload;
