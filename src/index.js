@@ -491,7 +491,7 @@ export default function register(api) {
         if (Array.isArray(content) && content.length) return { content };
         return { content: [{ type: 'text', text: 'OK' }] };
       },
-    });
+    }, { optional: true });
   }
 
   api.registerGatewayMethod('bosspig.status', async ({ respond }) => {
