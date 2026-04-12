@@ -726,14 +726,14 @@ export default function register(api) {
             }
           }
 
-          // Research nudge — fires at configured hour regardless of active hours.
+          // Research nudge — fires at or after the configured hour regardless of active hours.
           // Piggy wakes up and processes the queued event on her next heartbeat during active hours.
           if (latestCfg.researchNudgeEnabled !== false) {
             const tz = agent?.heartbeat?.activeHours?.timezone || 'America/Chicago';
             const nowLocal = new Date().toLocaleTimeString('en-US', { timeZone: tz, hour: '2-digit', hour12: false });
-            const researchHour = Number(latestCfg.researchCronHour ?? 8);
+            const researchHour = Number(latestCfg.researchCronHour ?? 2);
             const currentHour = Number(nowLocal);
-            if (currentHour === researchHour) {
+            if (currentHour >= researchHour) {
               const research = await runResearchCheck(api, latestCfg, stateFile, { timeZone: tz, dateKey: localDateKey(tz) });
               if (research?.alerted) {
                 await deliverPayload(research.payload, 'boss-pig-plugin-research', research.text);
