@@ -726,7 +726,8 @@ export default function register(api) {
             }
           }
 
-          // Research nudge — once per day at configured hour (default 2 AM local)
+          // Research nudge — fires at configured hour regardless of active hours.
+          // Piggy wakes up and processes the queued event on her next heartbeat during active hours.
           if (latestCfg.researchNudgeEnabled !== false) {
             const tz = agent?.heartbeat?.activeHours?.timezone || 'America/Chicago';
             const nowLocal = new Date().toLocaleTimeString('en-US', { timeZone: tz, hour: '2-digit', hour12: false });
