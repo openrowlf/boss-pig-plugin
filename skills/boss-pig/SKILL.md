@@ -121,6 +121,7 @@ On startup or first use:
 - "update / complete / abandon goal" → `update_goal`
 - "show research findings" → `list_research_findings`
 - "add this as a task from research" → `add_todo_from_research`
+- "/bosspig_run_research" or "run research now" or "do research" → trigger research pass (see Research trigger below)
 
 ## Automated research nudge
 
@@ -143,6 +144,20 @@ When you receive a `BOSS_PIG_PLUGIN_ALERT` with `type: "boss_pig.research_nudge"
 **Standard Google search is not enough.** Dig into 1-2 pages per interest. Read them. Extract what matters. Synthesize across sources. The goal is insight, not information.
 
 Do not mark `lastRunAt` on interests that were not actually researched (e.g., if you skip a day intentionally).
+
+## Research trigger (`/bosspig_run_research`)
+
+When the user triggers `/bosspig_run_research` (or says "run research now", "do research", etc.):
+
+1. Call `list_interests` to get all active interests
+2. For each interest with `enabled: true` and `frequency` not set to `manual`:
+   a. Call `update_interest` to set `lastRunAt` to now (so it won't be queued again until next interval)
+   b. Do deep web research on the topic — search, read pages, synthesize 2-3 actionable findings
+   c. For each actionable finding, call `add_todo_from_research` with title, notes (with source URL), `interestId`, `researchUrl`, `researchSource: "web"`, priority 3
+3. After all interests are processed, call `list_research_findings` to confirm findings were created
+4. Reply to the user: summarize what was researched and how many findings were created
+
+Research standard: same as the automated nudge above — not a quick search, but actual reading and synthesis. The user explicitly triggered this, so make it count.
 
 ## Behavior rules
 1. Category-first preflight for add/schedule actions:
