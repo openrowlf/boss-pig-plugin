@@ -642,6 +642,25 @@ export default function register(api) {
         }
       },
     });
+
+    api.registerCommand({
+      name: 'bosspig-run-research',
+      description: 'Trigger Boss Pig research worker now — spawns subagents to gather findings for all due interests',
+      acceptsArgs: false,
+      requireAuth: true,
+      handler: async () => {
+        try {
+          const cfg = getCfg();
+          const result = await runResearchWorker(api, cfg, stateFile);
+          if (result.spawned > 0) {
+            return { text: `Research worker triggered for ${result.spawned} interest(s): ${result.interests.join(', ')}. Findings will appear in Piggy's todo list shortly.` };
+          }
+          return { text: result.text };
+        } catch (err) {
+          return { text: `Research worker failed: ${err?.message || String(err)}` };
+        }
+      },
+    });
   }
 
   let timer = null;
