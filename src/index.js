@@ -15,6 +15,7 @@ const DEFAULTS = {
   backlogMaxItems: 3,
   researchNudgeEnabled: true,
   researchCronHour: 2, // 2 AM local time (overnight)
+  researchIntervalHours: 6, // how often the research worker runs
 };
 
 export function mergeConfig(raw = {}) {
@@ -269,6 +270,81 @@ function isInterestDue(interest) {
     return (now - lastRun) >= msPerWeek;
   }
   return true;
+}
+
+function isResearchWorkerDue(state, intervalHours) {
+  if (!state?.researchWorker?.lastRunAt) return true;
+  const msPerHour = 60 * 60 * 1000;
+  return (Date.now() - state.researchWorker.lastRunAt) >= (intervalHours * msPerHour);
+}
+
+async function runResearchWorker(api, cfg, stateFile) {
+  const state = await loadJson(stateFile, {
+    tasks: {},
+    lastAlert: null,
+    lastError: null,
+    research: { lastNudgeDate: null },
+    researchWorker: { lastRunAt: null, running: {} },
+  });
+
+  const intervalHours = Number(cfg.researchIntervalHours ?? 6);
+  if (!isResearchWorkerDue(state, intervalHours)) {
+    return { spawned: 0, text: 'Research worker not due yet.' };
+  }
+
+  const interests = await fetchInterests(cfg);
+  const due = interests.filter(isInterestDue);
+
+  if (!due.length) {
+    state.researchWorker.lastRunAt = Date.now();
+    await saveJson(stateFile, state);
+    return { spawned: 0, text: 'No interests due for research.' };
+  }
+
+  const spawned = [];
+  for (const interest of due) {
+    const sessionKey = `boss-pig-plugin:research:${interest.id}`;
+
+    // Skip if already running
+    if (state.researchWorker.running[interest.id]) {
+      api.logger.info(`[boss-pig-plugin] research already running for interest: ${interest.title}`);
+      continue;
+    }
+
+    const keywords = Array.isArray(interest.keywords) ? interest.keywords.join(', ') : (interest.keywords || interest.title);
+    const researchPrompt = [
+      `You are a research assistant for Steve's Boss Pig agent.`,
+      `Research topic: "${interest.title}"`,
+      keywords !== interest.title ? `Keywords: ${keywords}` : '',
+      `Interest category: ${interest.category || 'general'}`,
+      '',
+      `Do the following:
+1. Search the web for recent developments, news, or interesting findings on this topic.
+2. Use the Boss Pig MCP tool "add_todo_from_research" to create up to 3 research finding todos. Each finding should be a concise, actionable insight (title + description with source URL if available).
+3. Use the Boss Pig MCP tool "update_interest" to update lastRunAt = now() for this interest (id: ${interest.id}).`,
+      '',
+      `Be thorough but focused. Return 1-3 of the most interesting/Actionable findings. Cite sources where possible.`,
+    ].filter(Boolean).join('\n');
+
+    try {
+      const { runId } = await api.runtime.subagent.run({
+        sessionKey,
+        message: researchPrompt,
+        deliver: false,
+      });
+
+      state.researchWorker.running[interest.id] = { runId, startedAt: Date.now() };
+      spawned.push(interest.title);
+      api.logger.info(`[boss-pig-plugin] spawned research subagent for: ${interest.title} (runId: ${runId})`);
+    } catch (err) {
+      api.logger.warn(`[boss-pig-plugin] failed to spawn research for ${interest.title}: ${err?.message || String(err)}`);
+    }
+  }
+
+  state.researchWorker.lastRunAt = Date.now();
+  await saveJson(stateFile, state);
+
+  return { spawned: spawned.length, interests: spawned, text: `Research worker spawned ${spawned.length} task(s): ${spawned.join(', ')}` };
 }
 
 export async function runResearchCheck(api, cfg, stateFile, opts = {}) {
@@ -650,7 +726,7 @@ export default function register(api) {
             }
           }
 
-          // Research nudge — once per day at configured hour (default 8 AM local)
+          // Research nudge — once per day at configured hour (default 2 AM local)
           if (latestCfg.researchNudgeEnabled !== false) {
             const tz = agent?.heartbeat?.activeHours?.timezone || 'America/Chicago';
             const nowLocal = new Date().toLocaleTimeString('en-US', { timeZone: tz, hour: '2-digit', hour12: false });
@@ -661,6 +737,14 @@ export default function register(api) {
               if (research?.alerted) {
                 await deliverPayload(research.payload, 'boss-pig-plugin-research', research.text);
               }
+            }
+          }
+
+          // Research worker — background subagent spawning for active interests
+          {
+            const workerResult = await runResearchWorker(api, latestCfg, stateFile);
+            if (workerResult.spawned > 0) {
+              api.logger.info(`[boss-pig-plugin] research worker: ${workerResult.text}`);
             }
           }
         } catch (err) {
