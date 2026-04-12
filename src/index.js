@@ -272,13 +272,14 @@ function isInterestDue(interest) {
   return true;
 }
 
-function isResearchWorkerDue(state, intervalHours) {
+function isResearchWorkerDue(state, intervalHours, force = false) {
+  if (force) return true;
   if (!state?.researchWorker?.lastRunAt) return true;
   const msPerHour = 60 * 60 * 1000;
   return (Date.now() - state.researchWorker.lastRunAt) >= (intervalHours * msPerHour);
 }
 
-async function runResearchWorker(api, cfg, stateFile) {
+async function runResearchWorker(api, cfg, stateFile, opts = {}) {
   const state = await loadJson(stateFile, {
     tasks: {},
     lastAlert: null,
@@ -288,8 +289,8 @@ async function runResearchWorker(api, cfg, stateFile) {
   });
 
   const intervalHours = Number(cfg.researchIntervalHours ?? 6);
-  if (!isResearchWorkerDue(state, intervalHours)) {
-    return { spawned: 0, text: 'Research worker not due yet.' };
+  if (!isResearchWorkerDue(state, intervalHours, opts.force)) {
+    return { spawned: 0, text: `Research worker not due yet (interval: ${intervalHours}h, last run: ${state.researchWorker?.lastRunAt ? new Date(state.researchWorker.lastRunAt).toLocaleString() : 'never'}).` };
   }
 
   const interests = await fetchInterests(cfg);
@@ -651,7 +652,7 @@ export default function register(api) {
       handler: async () => {
         try {
           const cfg = getCfg();
-          const result = await runResearchWorker(api, cfg, stateFile);
+          const result = await runResearchWorker(api, cfg, stateFile, { force: true });
           if (result.spawned > 0) {
             return { text: `Research worker triggered for ${result.spawned} interest(s): ${result.interests.join(', ')}. Findings will appear in Piggy's todo list shortly.` };
           }
