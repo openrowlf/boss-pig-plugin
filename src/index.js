@@ -653,7 +653,7 @@ export default function register(api) {
     });
 
     api.registerCommand({
-      name: 'bosspig-run-research',
+      name: 'bosspig_run_research',
       description: 'Trigger Boss Pig research worker now — spawns subagents to gather findings for all due interests',
       acceptsArgs: false,
       requireAuth: true,
