@@ -326,7 +326,7 @@ async function runResearchWorker(api, cfg, stateFile, opts = {}) {
       ``,
       `Do the following:
 1. Search the web for recent developments, news, or interesting findings on this topic.
-2. Call the Boss Pig MCP endpoint (POST ${mcpUrl}) with JSON-RPC: {"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"add_research_finding","arguments":{...}}} to save each finding. Include: title, notes (with source URL), sourceUrl, sourceName, sourceType ("article"), tags (keyword), temporalContext.
+2. Call the Boss Pig MCP endpoint (POST ${mcpUrl}) with JSON-RPC: {"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"add_research_finding","arguments":{"interestId":"${interest.id}",...}}} to save each finding. Include: title, notes (with source URL), sourceUrl, sourceName, sourceType ("article"), tags (keyword), temporalContext. IMPORTANT: always include interestId set to "${interest.id}" for every finding.
 3. Call the Boss Pig MCP endpoint with {"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"update_interest","arguments":{"id":"${interest.id}"}}} to refresh lastRunAt to now.`,
       ``,
       `Be thorough but focused. Return 1-3 of the most interesting/actionable findings. Cite sources where possible.`,
