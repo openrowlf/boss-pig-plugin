@@ -73,57 +73,60 @@ On startup or first use:
 1. call `initialize`
 2. call `tools/list`
 
-## Available tools (current)
-- `list_todos`
-- `list_scheduled_todos`
-- `list_overdue_todos`
-- `add_todo`
-- `update_todo` (non-time fields)
-- `schedule_todo` (time changes)
-- `reschedule_todo` (alias for explicit reschedules)
-- `find_open_slots`
-- `list_selected_calendars`
-- `get_upcoming_events`
-- `get_schedule_summary`
-- `list_categories`
-- `create_category`
-- `update_category`
-- `delete_category`
-- `list_interests`
-- `create_interest`
-- `update_interest`
-- `delete_interest`
-- `list_goals`
-- `create_goal`
-- `update_goal`
-- `delete_goal`
-- `add_todo_from_research`
-- `list_research_findings`
-- `add_research_finding`
-- `update_research_finding`
-- `delete_research_finding`
+## Available tools (plugin-wrapped MCP tools)
+
+These tools are accessed via the Boss Pig plugin with the `boss_pig_` prefix:
+
+- `boss_pig_list_todos`
+- `boss_pig_list_scheduled_todos`
+- `boss_pig_list_overdue_todos`
+- `boss_pig_add_todo`
+- `boss_pig_update_todo` (non-time fields)
+- `boss_pig_schedule_todo` (time changes)
+- `boss_pig_reschedule_todo` (alias for explicit reschedules)
+- `boss_pig_find_open_slots`
+- `boss_pig_list_selected_calendars`
+- `boss_pig_get_upcoming_events`
+- `boss_pig_get_schedule_summary`
+- `boss_pig_list_categories`
+- `boss_pig_create_category`
+- `boss_pig_update_category`
+- `boss_pig_delete_category`
+- `boss_pig_list_interests`
+- `boss_pig_create_interest`
+- `boss_pig_update_interest`
+- `boss_pig_delete_interest`
+- `boss_pig_list_goals`
+- `boss_pig_create_goal`
+- `boss_pig_update_goal`
+- `boss_pig_delete_goal`
+- `boss_pig_add_todo_from_research`
+- `boss_pig_list_research_findings`
+- `boss_pig_add_research_finding`
+- `boss_pig_update_research_finding`
+- `boss_pig_delete_research_finding`
 
 ## Intent → tool mapping
-- "add task / todo" → `add_todo`
-- "show my todos / backlog" → `list_todos`
-- "show scheduled tasks" → `list_scheduled_todos`
-- "show overdue tasks" → `list_overdue_todos`
-- "find free time" → `find_open_slots`
-- "edit task" → `update_todo` (title/notes/priority/status/category only)
-- "delete / remove category" → `delete_category`
-- "schedule this task" → `schedule_todo`
-- "reschedule this task" → `reschedule_todo`
-- "what calendars are selected" → `list_selected_calendars`
-- "what's coming up" → `get_upcoming_events`
-- "summary of schedule" → `get_schedule_summary`
-- "I'm interested in / I want to research" → `create_interest`
-- "show my interests" → `list_interests`
-- "remove / stop researching" → `delete_interest`
-- "I want to achieve / I have a goal" → `create_goal`
-- "show my goals" → `list_goals`
-- "update / complete / abandon goal" → `update_goal`
-- "show research findings" → `list_research_findings`
-- "add this as a task from research" → `add_todo_from_research` (**NOTE**: this creates a TODO, NOT a research finding!)
+- "add task / todo" → `boss_pig_add_todo`
+- "show my todos / backlog" → `boss_pig_list_todos`
+- "show scheduled tasks" → `boss_pig_list_scheduled_todos`
+- "show overdue tasks" → `boss_pig_list_overdue_todos`
+- "find free time" → `boss_pig_find_open_slots`
+- "edit task" → `boss_pig_update_todo` (title/notes/priority/status/category only)
+- "delete / remove category" → `boss_pig_delete_category`
+- "schedule this task" → `boss_pig_schedule_todo`
+- "reschedule this task" → `boss_pig_reschedule_todo`
+- "what calendars are selected" → `boss_pig_list_selected_calendars`
+- "what's coming up" → `boss_pig_get_upcoming_events`
+- "summary of schedule" → `boss_pig_get_schedule_summary`
+- "I'm interested in / I want to research" → `boss_pig_create_interest`
+- "show my interests" → `boss_pig_list_interests`
+- "remove / stop researching" → `boss_pig_delete_interest`
+- "I want to achieve / I have a goal" → `boss_pig_create_goal`
+- "show my goals" → `boss_pig_list_goals`
+- "update / complete / abandon goal" → `boss_pig_update_goal`
+- "show research findings" → `boss_pig_list_research_findings`
+- "add this as a task from research" → `boss_pig_add_todo_from_research` (**NOTE**: this creates a TODO, NOT a research finding!)
 - "run research now" → spawn research sub-agents (see below)
 - `/bosspig_run_research` → the plugin command fires `runResearchWorker` which spawns sub-agents — you do NOT do the research yourself; wait for findings to appear, then synthesize
 

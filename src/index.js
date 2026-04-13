@@ -282,6 +282,8 @@ function isResearchWorkerDue(state, intervalHours, force = false) {
 async function runResearchWorker(api, cfg, stateFile, opts = {}) {
   const mcpUrl = cfg.mcpUrl || 'https://bosspig.moi/mcp'
   const apiKey = cfg.apiKey
+  const mcpUrl = cfg.mcpUrl || 'https://bosspig.moi/mcp'
+  const apiKey = cfg.apiKey
   const state = await loadJson(stateFile, {
     tasks: {},
     lastAlert: null,
@@ -543,6 +545,9 @@ export default function register(api) {
     'delete_goal',
     'add_todo_from_research',
     'list_research_findings',
+    'add_research_finding',
+    'update_research_finding',
+    'delete_research_finding',
   ];
 
   for (const toolName of bossPigTools) {
