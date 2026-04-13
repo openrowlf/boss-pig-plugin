@@ -282,8 +282,6 @@ function isResearchWorkerDue(state, intervalHours, force = false) {
 async function runResearchWorker(api, cfg, stateFile, opts = {}) {
   const mcpUrl = cfg.mcpUrl || 'https://bosspig.moi/mcp'
   const apiKey = cfg.apiKey
-  const mcpUrl = cfg.mcpUrl || 'https://bosspig.moi/mcp'
-  const apiKey = cfg.apiKey
   const state = await loadJson(stateFile, {
     tasks: {},
     lastAlert: null,
