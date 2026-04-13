@@ -123,8 +123,9 @@ On startup or first use:
 - "show my goals" → `list_goals`
 - "update / complete / abandon goal" → `update_goal`
 - "show research findings" → `list_research_findings`
-- "add this as a task from research" → `add_todo_from_research`
-- "/bosspig_run_research" or "run research now" or "do research" → trigger research pass (see Research trigger below)
+- "add this as a task from research" → `add_todo_from_research` (**NOTE**: this creates a TODO, NOT a research finding!)
+- "run research now" → spawn research sub-agents (see below)
+- `/bosspig_run_research` → the plugin command fires `runResearchWorker` which spawns sub-agents — you do NOT do the research yourself; wait for findings to appear, then synthesize
 
 ## Automated research nudge
 
@@ -133,33 +134,29 @@ The Boss Pig plugin fires a `boss_pig.research_nudge` system event once per day 
 When you receive a `BOSS_PIG_PLUGIN_ALERT` with `type: "boss_pig.research_nudge"`:
 
 1. Parse the `interests` array from the payload — each has `id`, `title`, `frequency`, `keywords`
-2. **Spawn a research sub-agent for each interest** using `sessions_spawn`:
-   - Use `runtime: "subagent"`, `mode: "run"`
-   - Set `sessionKey` to `boss-pig-research:<interestId>` so results are isolated
-   - In the task prompt, include: the interest title, keywords, and the Boss Pig MCP endpoint URL + the user's API key
-   - Tell the sub-agent to:
-     a. Search the web deeply on the topic (use web search, read pages, extract key insights)
-     b. Call `add_research_finding` MCP tool for each significant finding (title, notes with source URL, sourceName, sourceType, tags, temporalContext)
-     c. Call `update_interest` to refresh `lastRunAt = now()`
-3. **Do not do the research yourself** — delegate to sub-agents
-4. **Synthesis**: On your next regular heartbeat (not the same turn), check `list_research_findings` for new findings created since `lastRunAt` of each interest. Present a brief summary to Steve: what was researched, how many new findings appeared, and what action (if any) is recommended.
-5. If findings warrant it, use `add_todo_from_research` to create linked todos for the most important items.
+2. **Check if sub-agents have already run** — the plugin's `runResearchWorker` fires separately and spawns sub-agents automatically. On receiving this nudge, call `list_research_findings` to check what findings already exist since the last nudge.
+3. **Synthesize and present findings** — for any new research findings created since yesterday, present them to Steve:
+   - What was researched
+   - Key findings (2-3 bullets per interest)
+   - Action items → use `add_todo_from_research` if anything warrants a task
+4. Do NOT try to do the research yourself in this event — sub-agents handle that via the plugin's worker. Your job is to synthesize and report.
+5. If no new findings appear and interests are due, you MAY spawn research sub-agents manually using `sessions_spawn`:
+   - `runtime: "subagent"`, `mode: "run"`
+   - `sessionKey: "boss-pig-research:<interestId>"`
+   - Include in the prompt: interest title, keywords, MCP endpoint URL, and API key
+   - Tell the sub-agent to call `add_research_finding` for each finding, then `update_interest` for `lastRunAt`
 
 ## Research trigger (`/bosspig_run_research`)
 
-When the user triggers `/bosspig_run_research` (or says "run research now", "do research", etc.):
+When `/bosspig_run_research` is triggered:
 
-1. Call `list_interests` to get all active interests
-2. For each interest with `enabled: true` and `frequency` not set to `manual`:
-   a. Call `update_interest` to set `lastRunAt` to now (so it won't be queued again until next interval)
-   b. **Spawn a research sub-agent** using `sessions_spawn`:
-      - `runtime: "subagent"`, `mode: "run"`
-      - `sessionKey: "boss-pig-research:<interestId>"`
-      - Include the interest title, keywords, MCP endpoint URL, and the user's API key in the prompt
-      - Tell the sub-agent to search the topic deeply, then call `add_research_finding` for each key insight, and `update_interest` to refresh `lastRunAt`
-   c. Do NOT do the research yourself — always delegate to sub-agents
-3. After spawning all sub-agents, call `list_research_findings` to confirm findings were created
-4. Reply to the user: confirm research was triggered for N interest(s); findings will appear in the Research dashboard shortly
+1. The plugin's `bosspig-run-research` command fires `runResearchWorker` which spawns sub-agents automatically.
+2. **You do NOT do the research yourself.** Wait for findings to appear.
+3. After a short delay, call `list_research_findings` to check what was created.
+4. Present the findings to Steve: what was researched, key insights, action items.
+5. If findings warrant tasks, use `add_todo_from_research` to link them.
+
+**Important**: `add_todo_from_research` creates a TODO linked to research — it does NOT create a research finding. To save a research finding, sub-agents use `add_research_finding` (via raw HTTP call to the MCP endpoint).
 
 ## Behavior rules
 1. Category-first preflight for add/schedule actions:
