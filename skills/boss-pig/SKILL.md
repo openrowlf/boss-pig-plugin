@@ -99,6 +99,9 @@ On startup or first use:
 - `delete_goal`
 - `add_todo_from_research`
 - `list_research_findings`
+- `add_research_finding`
+- `update_research_finding`
+- `delete_research_finding`
 
 ## Intent → tool mapping
 - "add task / todo" → `add_todo`
@@ -128,22 +131,19 @@ On startup or first use:
 The Boss Pig plugin fires a `boss_pig.research_nudge` system event once per day (default: 2 AM America/Chicago) when interests are due for research.
 
 When you receive a `BOSS_PIG_PLUGIN_ALERT` with `type: "boss_pig.research_nudge"`:
-1. Parse the `interests` array from the payload
-2. For each interest, use `update_interest` to refresh `lastRunAt` to now (so it won't fire again until next frequency window)
-3. Research the topic deeply — not just a quick search. Use web search to find relevant pages, then **open and read the most promising ones**. Look for:
-   - Specific details, data points, or recommendations (not just titles)
-   - Contradictions or gaps between sources
-   - Recent updates or developments (within the last 6 months preferred)
-   - Actionable steps the user could take right now
-4. Present findings conversationally. For each interest researched, structure your response as:
-   - **What I found** — a synthesized summary of 3-5 key insights (not a list of links)
-   - **Best sources** — 2-3 specific URLs with a one-line note on why each matters
-   - **What to do next** — concrete, actionable items (e.g., "buy Yukon Gold seed potatoes from [local nursery link]")
-5. If anything warrants a task, use `add_todo_from_research` to create it linked to the interest
 
-**Standard Google search is not enough.** Dig into 1-2 pages per interest. Read them. Extract what matters. Synthesize across sources. The goal is insight, not information.
-
-Do not mark `lastRunAt` on interests that were not actually researched (e.g., if you skip a day intentionally).
+1. Parse the `interests` array from the payload — each has `id`, `title`, `frequency`, `keywords`
+2. **Spawn a research sub-agent for each interest** using `sessions_spawn`:
+   - Use `runtime: "subagent"`, `mode: "run"`
+   - Set `sessionKey` to `boss-pig-research:<interestId>` so results are isolated
+   - In the task prompt, include: the interest title, keywords, and the Boss Pig MCP endpoint URL + the user's API key
+   - Tell the sub-agent to:
+     a. Search the web deeply on the topic (use web search, read pages, extract key insights)
+     b. Call `add_research_finding` MCP tool for each significant finding (title, notes with source URL, sourceName, sourceType, tags, temporalContext)
+     c. Call `update_interest` to refresh `lastRunAt = now()`
+3. **Do not do the research yourself** — delegate to sub-agents
+4. **Synthesis**: On your next regular heartbeat (not the same turn), check `list_research_findings` for new findings created since `lastRunAt` of each interest. Present a brief summary to Steve: what was researched, how many new findings appeared, and what action (if any) is recommended.
+5. If findings warrant it, use `add_todo_from_research` to create linked todos for the most important items.
 
 ## Research trigger (`/bosspig_run_research`)
 
@@ -152,12 +152,14 @@ When the user triggers `/bosspig_run_research` (or says "run research now", "do 
 1. Call `list_interests` to get all active interests
 2. For each interest with `enabled: true` and `frequency` not set to `manual`:
    a. Call `update_interest` to set `lastRunAt` to now (so it won't be queued again until next interval)
-   b. Do deep web research on the topic — search, read pages, synthesize 2-3 actionable findings
-   c. For each actionable finding, call `add_todo_from_research` with title, notes (with source URL), `interestId`, `researchUrl`, `researchSource: "web"`, priority 3
-3. After all interests are processed, call `list_research_findings` to confirm findings were created
-4. Reply to the user: summarize what was researched and how many findings were created
-
-Research standard: same as the automated nudge above — not a quick search, but actual reading and synthesis. The user explicitly triggered this, so make it count.
+   b. **Spawn a research sub-agent** using `sessions_spawn`:
+      - `runtime: "subagent"`, `mode: "run"`
+      - `sessionKey: "boss-pig-research:<interestId>"`
+      - Include the interest title, keywords, MCP endpoint URL, and the user's API key in the prompt
+      - Tell the sub-agent to search the topic deeply, then call `add_research_finding` for each key insight, and `update_interest` to refresh `lastRunAt`
+   c. Do NOT do the research yourself — always delegate to sub-agents
+3. After spawning all sub-agents, call `list_research_findings` to confirm findings were created
+4. Reply to the user: confirm research was triggered for N interest(s); findings will appear in the Research dashboard shortly
 
 ## Behavior rules
 1. Category-first preflight for add/schedule actions:

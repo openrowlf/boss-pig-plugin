@@ -280,6 +280,8 @@ function isResearchWorkerDue(state, intervalHours, force = false) {
 }
 
 async function runResearchWorker(api, cfg, stateFile, opts = {}) {
+  const mcpUrl = cfg.mcpUrl || 'https://bosspig.moi/mcp'
+  const apiKey = cfg.apiKey
   const state = await loadJson(stateFile, {
     tasks: {},
     lastAlert: null,
@@ -318,13 +320,16 @@ async function runResearchWorker(api, cfg, stateFile, opts = {}) {
       `Research topic: "${interest.title}"`,
       keywords !== interest.title ? `Keywords: ${keywords}` : '',
       `Interest category: ${interest.category || 'general'}`,
-      '',
+      ``,
+      `Boss Pig MCP endpoint: ${mcpUrl}`,
+      `Authorization header: Bearer ${apiKey}`,
+      ``,
       `Do the following:
 1. Search the web for recent developments, news, or interesting findings on this topic.
-2. Use the Boss Pig MCP tool "add_todo_from_research" to create up to 3 research finding todos. Each finding should be a concise, actionable insight (title + description with source URL if available).
-3. Use the Boss Pig MCP tool "update_interest" to update lastRunAt = now() for this interest (id: ${interest.id}).`,
-      '',
-      `Be thorough but focused. Return 1-3 of the most interesting/Actionable findings. Cite sources where possible.`,
+2. Call the Boss Pig MCP endpoint (POST ${mcpUrl}) with JSON-RPC: {"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"add_research_finding","arguments":{...}}} to save each finding. Include: title, notes (with source URL), sourceUrl, sourceName, sourceType ("article"), tags (keyword), temporalContext.
+3. Call the Boss Pig MCP endpoint with {"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"update_interest","arguments":{"id":"${interest.id}"}}} to refresh lastRunAt to now.`,
+      ``,
+      `Be thorough but focused. Return 1-3 of the most interesting/actionable findings. Cite sources where possible.`,
     ].filter(Boolean).join('\n');
 
     try {
